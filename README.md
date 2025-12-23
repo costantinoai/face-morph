@@ -304,28 +304,12 @@ print(f"Results saved to: {output_dir}")
 
 ## Output Structure
 
-### Default Mode
+### Full Mode (Default)
 
-Generates 41 interpolated frames (0%, 2.5%, 5%, ..., 100%) plus heatmaps:
+By default, generates comprehensive output: 41 interpolated frames + heatmaps + meshes + video + CSV:
 
 ![Morph Progression](assets/demo_progression.png)
 *Morphing progression: 0%, 25%, 50%, 75%, 100%*
-
-```
-results/YYYYMMDD_HHMMSS/face1_face2/
-├── png/
-│   ├── face1-000_face2-1000.png  # 0% face1, 100% face2
-│   ├── face1-025_face2-975.png   # 2.5% face1, 97.5% face2
-│   ├── face1-500_face2-500.png   # 50-50 blend
-│   └── ...                        # 41 frames total
-├── shape_displacement_components.png
-├── texture_difference_components.png
-└── session.log
-```
-
-### Full Mode
-
-Adds mesh exports, video, and CSV data:
 
 ```
 results/YYYYMMDD_HHMMSS/face1_face2/
@@ -337,6 +321,22 @@ results/YYYYMMDD_HHMMSS/face1_face2/
 ├── statistics.csv                 # Summary metrics
 ├── vertex_displacements.csv       # Per-vertex displacement data
 ├── texture_differences.csv        # Per-pixel texture differences
+└── session.log
+```
+
+### Minimal Mode (--minimal flag)
+
+For faster processing, use `--minimal` to generate only PNG frames and heatmaps:
+
+```
+results/YYYYMMDD_HHMMSS/face1_face2/
+├── png/
+│   ├── face1-000_face2-1000.png  # 0% face1, 100% face2
+│   ├── face1-025_face2-975.png   # 2.5% face1, 97.5% face2
+│   ├── face1-500_face2-500.png   # 50-50 blend
+│   └── ...                        # 41 frames total
+├── shape_displacement_components.png
+├── texture_difference_components.png
 └── session.log
 ```
 
@@ -370,21 +370,34 @@ Three components showing appearance changes:
 
 ## Performance
 
-Tested on NVIDIA GeForce RTX 3080 Laptop GPU with 18K vertex textured meshes:
+Tested on NVIDIA GeForce RTX 3080 Laptop GPU with 18K vertex textured meshes (41 frames):
 
-| Mode | Device | Time | Notes |
-|------|--------|------|-------|
-| Default | CPU | ~16s | PyRender (OpenGL) |
-| Default | GPU | ~18s | PyTorch3D batch rendering |
-| Full | CPU | ~48s | +FBX export + video |
+### Single Pair Processing
 
-GPU batch rendering is active and working. For small workloads (41 frames), performance is comparable to CPU due to transfer overhead. GPU excels with larger batches or full mode processing.
+| Mode | Device | Time | Output Size | Notes |
+|------|--------|------|-------------|-------|
+| Minimal | CPU | ~14s | ~1.1 MB | PNG + heatmaps only |
+| Minimal | GPU | ~18s | ~1.1 MB | PyTorch3D batch rendering |
+| Full (default) | CPU | ~48s | ~5.3 MB | +meshes + video + CSV |
+| Full (default) | GPU | ~21s | ~5.3 MB | GPU acceleration active |
+
+### Batch Processing (6 pairs)
+
+| Mode | Device | Total Time | Per Pair | Notes |
+|------|--------|------------|----------|-------|
+| Minimal | CPU | ~84s | ~14s | Sequential processing |
+| Full | CPU | ~5 min | ~50s | Includes FBX export + video |
+
+**GPU Performance Notes:**
+- GPU has initialization overhead (~3-5s), making it comparable to CPU for single pairs
+- GPU advantage increases with batch size and full mode processing
+- Mixed precision (FP16) provides additional 20-30% speedup on GPU
 
 **Optimizations:**
 - Device transfers: 98.8% reduction (2 vs 164 unoptimized)
 - Parallel heatmap generation (ThreadPoolExecutor)
 - Batch rendering with chunking (10 meshes/batch)
-- Optional mixed precision (FP16)
+- Optional mixed precision (FP16) for GPU
 - Zero memory leaks (verified)
 
 ## CLI Reference
@@ -397,13 +410,15 @@ Arguments:
 
 Options:
   -o, --output PATH     Output directory (default: results/)
-  --full                Full mode: meshes + video + CSV
+  --minimal             Minimal mode: PNG + heatmaps only (faster)
   --gpu / --cpu         Device (default: cpu)
   --no-amp              Disable mixed precision (FP16)
   --log-level LEVEL     DEBUG|INFO|WARNING|ERROR
-  --blender PATH        Blender executable path
+  --blender PATH        Blender executable path (auto-detected)
   -q, --quiet           Suppress output
   --help                Show help
+
+Default: Full mode (PNG + heatmaps + meshes + video + CSV)
 ```
 
 ```
