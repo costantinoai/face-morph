@@ -3,4 +3,6 @@
 Entry points for face-morph and morph commands.
 """
 
-__all__ = []
+from .main import main, cli
+
+__all__ = ['main', 'cli']

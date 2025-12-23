@@ -31,6 +31,13 @@ from face_morph.rendering.factory import create_optimal_renderer, get_renderer_t
 from face_morph.visualization.heatmap import (
     create_shape_displacement_visualization,
     create_texture_difference_components_visualization,
+    compute_shape_displacement_components,
+    compute_texture_difference_components,
+)
+from face_morph.visualization.export import (
+    export_statistics_csv,
+    export_vertex_data_csv,
+    export_texture_data_csv,
 )
 from face_morph.visualization.video import create_video_from_frames, check_ffmpeg_available
 from face_morph.utils.logging import setup_logger, get_logger
@@ -396,6 +403,11 @@ def run_morphing_pipeline(config: MorphConfig) -> Path:
     # Shape displacement heatmap (always generated)
     log("  Computing shape displacement between stimulus A and B...")
 
+    # Compute displacement components (needed for both heatmaps and CSV export)
+    normal_disp, tangent_disp, total_disp = compute_shape_displacement_components(
+        mesh1, mesh2
+    )
+
     # Move meshes to renderer's device for heatmap rendering
     mesh1_for_heatmap = mesh1.to(renderer.device) if hasattr(mesh1, 'to') else mesh1
     mesh2_for_heatmap = mesh2.to(renderer.device) if hasattr(mesh2, 'to') else mesh2
@@ -417,8 +429,18 @@ def run_morphing_pipeline(config: MorphConfig) -> Path:
         log(f"  Warning: Shape heatmap error: {e}")
 
     # Texture difference heatmap (only if textures available)
+    luminance_diff = None
+    chroma_diff = None
+    delta_e = None
+
     if has_textures and texture1 is not None and texture2 is not None:
         log("  Computing texture difference between stimulus A and B...")
+
+        # Compute texture difference components (needed for both heatmaps and CSV export)
+        luminance_diff, chroma_diff, delta_e = compute_texture_difference_components(
+            [texture1, texture2]
+        )
+
         texture_heatmap_path = pair_dir / "texture_difference_components.png"
 
         try:
@@ -472,11 +494,38 @@ def run_morphing_pipeline(config: MorphConfig) -> Path:
     # STEP 9: Export CSV data (full mode only)
     # -------------------------------------------------------------------------
 
-    # TODO (Week 3): Implement CSV export
-    # if config.should_export_csv:
-    #     log("STEP 9: Exporting CSV data...")
-    #     # Export statistics.csv, vertex_displacements.csv, texture_differences.csv
-    #     log("")
+    if config.should_export_csv:
+        log("STEP 9: Exporting CSV data for quantitative analysis...")
+
+        # Export summary statistics
+        stats_csv_path = pair_dir / "statistics.csv"
+        export_statistics_csv(
+            normal_disp, tangent_disp, total_disp,
+            luminance_diff, chroma_diff, delta_e,
+            stats_csv_path
+        )
+        log("  ✓ Statistics exported to statistics.csv")
+
+        # Export per-vertex displacement data
+        vertex_csv_path = pair_dir / "vertex_displacements.csv"
+        export_vertex_data_csv(
+            mesh1, mesh2,
+            normal_disp, tangent_disp, total_disp,
+            vertex_csv_path
+        )
+        log("  ✓ Vertex data exported to vertex_displacements.csv")
+
+        # Export per-pixel texture data (if textures available)
+        if has_textures and luminance_diff is not None:
+            texture_csv_path = pair_dir / "texture_differences.csv"
+            export_texture_data_csv(
+                luminance_diff, chroma_diff, delta_e,
+                texture_csv_path,
+                downsample_factor=4  # Reduce CSV size
+            )
+            log("  ✓ Texture data exported to texture_differences.csv")
+
+        log("")
 
     # -------------------------------------------------------------------------
     # STEP 10: Cleanup & Summary
@@ -508,6 +557,18 @@ def run_morphing_pipeline(config: MorphConfig) -> Path:
 
     if config.should_create_video and video_file.exists():
         log(f"  Video: {video_file}")
+
+    if config.should_export_csv:
+        stats_csv_path = pair_dir / "statistics.csv"
+        vertex_csv_path = pair_dir / "vertex_displacements.csv"
+        texture_csv_path = pair_dir / "texture_differences.csv"
+
+        if stats_csv_path.exists():
+            log(f"  Statistics CSV: {stats_csv_path.name}")
+        if vertex_csv_path.exists():
+            log(f"  Vertex data CSV: {vertex_csv_path.name}")
+        if has_textures and texture_csv_path.exists():
+            log(f"  Texture data CSV: {texture_csv_path.name}")
 
     log(f"  Session log: {log_file}")
     log("=" * 70)
