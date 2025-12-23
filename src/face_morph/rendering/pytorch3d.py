@@ -154,11 +154,15 @@ class MeshRenderer3D(BaseRenderer):
             # Ensure faces_uvs has correct shape and device
             if faces_uvs.dim() == 2:
                 faces_uvs = faces_uvs.unsqueeze(0)
-            faces_uvs = faces_uvs.to(self.device)
+            # Optimize: Only transfer if not already on device
+            if faces_uvs.device != self.device:
+                faces_uvs = faces_uvs.to(self.device)
 
-            # Ensure texture and verts_uvs are on correct device
-            texture = texture.to(self.device)
-            verts_uvs_clamped = verts_uvs_clamped.to(self.device)
+            # Optimize: Only transfer if not already on device
+            if texture.device != self.device:
+                texture = texture.to(self.device)
+            if verts_uvs_clamped.device != self.device:
+                verts_uvs_clamped = verts_uvs_clamped.to(self.device)
 
             # Fix for cyan artifacts: texture is mostly black (background), but some UVs sample from it
             # When very dark texture values (~0) interact with Phong lighting, numerical issues
@@ -199,7 +203,10 @@ class MeshRenderer3D(BaseRenderer):
             if vertex_colors.dim() == 2:
                 vertex_colors = vertex_colors.unsqueeze(0)  # Add batch dimension
 
-            textures = TexturesVertex(verts_features=vertex_colors.to(self.device))
+            # Optimize: Only transfer if not already on device
+            if vertex_colors.device != self.device:
+                vertex_colors = vertex_colors.to(self.device)
+            textures = TexturesVertex(verts_features=vertex_colors)
             mesh.textures = textures
 
         else:
@@ -207,12 +214,19 @@ class MeshRenderer3D(BaseRenderer):
             verts = mesh.verts_packed()
             vertex_colors = torch.ones_like(verts) * 0.7  # Gray
             vertex_colors = vertex_colors.unsqueeze(0)
-            textures = TexturesVertex(verts_features=vertex_colors.to(self.device))
+            # Optimize: Only transfer if not already on device
+            if vertex_colors.device != self.device:
+                vertex_colors = vertex_colors.to(self.device)
+            textures = TexturesVertex(verts_features=vertex_colors)
             mesh.textures = textures
+
+        # Optimize: Only transfer mesh if not already on device
+        if mesh.device != self.device:
+            mesh = mesh.to(self.device)
 
         # Render on the device specified during initialization
         with torch.inference_mode():
-            images = self.renderer(mesh.to(self.device))
+            images = self.renderer(mesh)
 
         # Extract RGB (remove alpha channel if present)
         image = images[0, ..., :3].cpu().numpy()
@@ -317,11 +331,19 @@ class MeshRenderer3D(BaseRenderer):
                     faces_uvs = faces_uvs.unsqueeze(0)
 
                 # Replicate UVs for all meshes in batch
-                verts_uvs_batch = verts_uvs_clamped.expand(len(meshes_list), -1, -1).to(self.device)
-                faces_uvs_batch = faces_uvs.expand(len(meshes_list), -1, -1).to(self.device)
+                verts_uvs_batch = verts_uvs_clamped.expand(len(meshes_list), -1, -1)
+                faces_uvs_batch = faces_uvs.expand(len(meshes_list), -1, -1)
+
+                # Optimize: Only transfer if not already on device
+                if verts_uvs_batch.device != self.device:
+                    verts_uvs_batch = verts_uvs_batch.to(self.device)
+                if faces_uvs_batch.device != self.device:
+                    faces_uvs_batch = faces_uvs_batch.to(self.device)
+                if texture_batch.device != self.device:
+                    texture_batch = texture_batch.to(self.device)
 
                 textures = TexturesUV(
-                    maps=texture_batch.to(self.device),
+                    maps=texture_batch,
                     faces_uvs=faces_uvs_batch,
                     verts_uvs=verts_uvs_batch,
                     padding_mode='border',
@@ -339,12 +361,19 @@ class MeshRenderer3D(BaseRenderer):
                 else:
                     all_colors = torch.cat([all_colors, vertex_colors.unsqueeze(0)], dim=0)
 
-            textures = TexturesVertex(verts_features=all_colors.to(self.device))
+            # Optimize: Only transfer if not already on device
+            if all_colors.device != self.device:
+                all_colors = all_colors.to(self.device)
+            textures = TexturesVertex(verts_features=all_colors)
             batched_mesh.textures = textures
+
+        # Optimize: Only transfer mesh if not already on device
+        if batched_mesh.device != self.device:
+            batched_mesh = batched_mesh.to(self.device)
 
         # Render all meshes at once
         with torch.inference_mode():
-            images_batch = self.renderer(batched_mesh.to(self.device))
+            images_batch = self.renderer(batched_mesh)
 
         # Split batch into individual images
         results = []

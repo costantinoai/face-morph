@@ -243,6 +243,24 @@ def run_morphing_pipeline(config: MorphConfig) -> Path:
     else:
         log("  Renderer: PyRender (CPU mode - 50-100x faster)")
 
+    # Initialize device manager to track and minimize transfers
+    from face_morph.utils.device import DeviceManager, optimize_texture_device
+    device_manager = DeviceManager(renderer.device)
+
+    # Optimize: Move meshes to renderer device once (not in render loop)
+    mesh1 = device_manager.ensure_mesh_device(mesh1, renderer.device)
+    mesh2 = device_manager.ensure_mesh_device(mesh2, renderer.device)
+
+    # Optimize: Move textures/UVs to renderer device once (not in render loop)
+    if has_textures and renderer_type == 'pytorch3d':
+        texture1, aux1['verts_uvs'], aux1['faces_uvs'] = optimize_texture_device(
+            texture1, aux1.get('verts_uvs'), aux1.get('faces_uvs'), renderer.device
+        )
+        texture2, _, _ = optimize_texture_device(
+            texture2, None, None, renderer.device  # UVs already moved
+        )
+        log("  Optimized textures/UVs to renderer device")
+
     log("")
 
     # -------------------------------------------------------------------------
@@ -424,9 +442,9 @@ def run_morphing_pipeline(config: MorphConfig) -> Path:
         mesh1, mesh2
     )
 
-    # Move meshes to renderer's device for heatmap rendering
-    mesh1_for_heatmap = mesh1.to(renderer.device) if hasattr(mesh1, 'to') else mesh1
-    mesh2_for_heatmap = mesh2.to(renderer.device) if hasattr(mesh2, 'to') else mesh2
+    # Meshes are already on renderer device (optimized earlier), no transfer needed
+    mesh1_for_heatmap = mesh1
+    mesh2_for_heatmap = mesh2
 
     # Compute texture difference components if available
     luminance_diff = None
@@ -605,6 +623,11 @@ def run_morphing_pipeline(config: MorphConfig) -> Path:
             log(f"  Texture data CSV: {texture_csv_path.name}")
 
     log(f"  Session log: {log_file}")
+
+    # Log device transfer optimization stats
+    transfer_count = device_manager.get_transfer_count()
+    log(f"  Device transfers: {transfer_count} (optimized)")
+
     log("=" * 70)
     log("SUCCESS!")
     log("=" * 70)
