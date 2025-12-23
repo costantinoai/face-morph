@@ -1,0 +1,111 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "face-morph"
+version = "1.0.0"
+description = "Production-ready 3D face morphing with GPU acceleration and advanced heatmap visualization"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Face Morph Contributors", email = "face-morph@example.com"}
+]
+keywords = ["3d", "morphing", "face", "mesh", "pytorch3d", "computer-vision", "heatmap", "research"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+
+# CPU-only base dependencies (works without CUDA)
+dependencies = [
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "numpy>=1.24.0",
+    "scipy>=1.11.0",
+    "pillow>=10.0.0",
+    "matplotlib>=3.7.0",
+    "pyrender>=0.1.45",  # CPU renderer - fast and reliable
+    "trimesh>=3.21.0",
+    "scikit-image>=0.21.0",  # For LAB color space in heatmaps
+    "click>=8.0.0",  # Modern CLI framework
+    "tqdm>=4.65.0",  # Progress bars
+]
+
+[project.optional-dependencies]
+# GPU support - requires manual PyTorch3D compilation
+cuda = [
+    "fvcore>=0.1.5",  # PyTorch3D dependency
+    "iopath>=0.1.9",  # PyTorch3D dependency
+]
+
+# Development dependencies
+dev = [
+    "pytest>=7.3.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.3.0",
+]
+
+# All extras
+all = ["face-morph[cuda,dev]"]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/face-morph"
+Documentation = "https://github.com/yourusername/face-morph/docs"
+Repository = "https://github.com/yourusername/face-morph"
+Issues = "https://github.com/yourusername/face-morph/issues"
+
+[project.scripts]
+face-morph = "face_morph.cli.main:main"
+morph = "face_morph.cli.main:main"  # Alias for backward compatibility
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+face_morph = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311', 'py312']
+exclude = '''
+/(
+    \.git
+  | \.mypy_cache
+  | \.pytest_cache
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip_gitignore = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+addopts = "--cov=face_morph --cov-report=html --cov-report=term-missing"
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false  # Gradual typing
+ignore_missing_imports = true
