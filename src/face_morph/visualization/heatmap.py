@@ -7,6 +7,11 @@ from typing import List, Tuple, Optional
 import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
 
+from face_morph.utils.logging import get_logger
+
+# Get logger for this module
+logger = get_logger(__name__)
+
 
 def compute_shape_displacement_components(
     mesh_a,
@@ -158,7 +163,7 @@ def create_heatmap_image(
         return output_path.exists()
 
     except Exception as e:
-        print(f"Error creating heatmap: {e}")
+        logger.error(f"Error creating heatmap: {e}")
         return False
 
 

@@ -16,7 +16,11 @@ import pyrender
 import trimesh
 from pathlib import Path
 from typing import Optional, Tuple, List
-from .utils import vprint
+
+from face_morph.utils.logging import get_logger
+
+# Get logger for this module
+logger = get_logger(__name__)
 
 
 def split_vertices_at_seams(vertices, faces, uv_coords, uv_faces):
@@ -37,8 +41,8 @@ def split_vertices_at_seams(vertices, faces, uv_coords, uv_faces):
         new_faces: (F, 3) updated face indices
         new_uvs: (V', 2) per-vertex UVs
     """
-    vprint(f"[PyRender] Splitting vertices at texture seams...")
-    vprint(f"[PyRender]   Original: {len(vertices)} verts, {len(uv_coords)} UVs")
+    logger.debug("Splitting vertices at texture seams...")
+    logger.debug("  Original: {len(vertices)} verts, {len(uv_coords)} UVs")
 
     # Create a mapping from (vertex_idx, uv_idx) -> new_vertex_idx
     vertex_uv_map = {}
@@ -69,9 +73,9 @@ def split_vertices_at_seams(vertices, faces, uv_coords, uv_faces):
     new_uvs = np.array(new_uvs, dtype=np.float32)
     new_faces = np.array(new_faces, dtype=np.int32)
 
-    vprint(f"[PyRender]   After split: {len(new_vertices)} verts (1:1 with UVs)")
-    vprint(f"[PyRender]   Shapes - vertices: {new_vertices.shape}, uvs: {new_uvs.shape}, faces: {new_faces.shape}")
-    vprint(f"[PyRender]   Dtypes - vertices: {new_vertices.dtype}, uvs: {new_uvs.dtype}")
+    logger.debug("  After split: {len(new_vertices)} verts (1:1 with UVs)")
+    logger.debug("  Shapes - vertices: {new_vertices.shape}, uvs: {new_uvs.shape}, faces: {new_faces.shape}")
+    logger.debug("  Dtypes - vertices: {new_vertices.dtype}, uvs: {new_uvs.dtype}")
 
     return new_vertices, new_faces, new_uvs
 
@@ -109,10 +113,10 @@ class PyRenderMeshRenderer:
                 viewport_width=image_size,
                 viewport_height=image_size,
             )
-            vprint(f"[PyRender] Using offscreen renderer (OSMesa/OpenGL)")
+            logger.debug("Using offscreen renderer (OSMesa/OpenGL)")
         else:
             self.renderer = None  # Will create on-demand
-            vprint(f"[PyRender] Using interactive renderer")
+            logger.debug("Using interactive renderer")
 
     def render_mesh(
         self,
@@ -136,7 +140,6 @@ class PyRenderMeshRenderer:
         Returns:
             RGB image as numpy array (H, W, 3) in range [0, 255], uint8
         """
-        from .utils import vprint
 
         # Apply texture or colors
         if texture is not None and uv_coords is not None:
@@ -160,7 +163,7 @@ class PyRenderMeshRenderer:
 
             # Handle texture seams: Split vertices if needed
             if uv_coords.ndim != 2 or uv_coords.shape[1] != 2:
-                vprint(f"[PyRender] Warning: UV coords have unexpected shape {uv_coords.shape}, skipping texture")
+                logger.debug("Warning: UV coords have unexpected shape {uv_coords.shape}, skipping texture")
                 # Create mesh and fall back to default color
                 mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
                 mesh.visual.vertex_colors = np.ones((len(vertices), 4)) * [180, 180, 180, 255]
@@ -169,8 +172,8 @@ class PyRenderMeshRenderer:
                 # UV coordinates don't match vertex count - texture has seams
                 # Need to split vertices at seams to create 1:1 mapping
                 if uv_faces is not None:
-                    vprint(f"[PyRender] UV count {uv_coords.shape[0]} != vertex count {vertices.shape[0]}")
-                    vprint(f"[PyRender] Splitting vertices at texture seams...")
+                    logger.debug("UV count {uv_coords.shape[0]} != vertex count {vertices.shape[0]}")
+                    logger.debug("Splitting vertices at texture seams...")
 
                     # Split vertices to create 1:1 vertex-UV mapping
                     new_vertices, new_faces, new_uvs = split_vertices_at_seams(
@@ -179,19 +182,19 @@ class PyRenderMeshRenderer:
 
                     # Create mesh with split vertices
                     # IMPORTANT: process=False to prevent vertex merging/cleanup
-                    vprint(f"[PyRender] Creating trimesh: verts={new_vertices.shape}, faces={new_faces.shape}")
+                    logger.debug("Creating trimesh: verts={new_vertices.shape}, faces={new_faces.shape}")
                     mesh = trimesh.Trimesh(vertices=new_vertices, faces=new_faces, process=False)
-                    vprint(f"[PyRender] Trimesh created, adding texture with UV={new_uvs.shape}")
-                    vprint(f"[PyRender] UV range: [{new_uvs.min():.3f}, {new_uvs.max():.3f}]")
+                    logger.debug("Trimesh created, adding texture with UV={new_uvs.shape}")
+                    logger.debug("UV range: [{new_uvs.min():.3f}, {new_uvs.max():.3f}]")
                     mesh.visual = trimesh.visual.TextureVisuals(
                         uv=new_uvs,
                         image=texture_image
                     )
-                    vprint(f"[PyRender] Trimesh.visual.uv shape: {mesh.visual.uv.shape}")
-                    vprint(f"[PyRender] Trimesh.vertices shape: {mesh.vertices.shape}")
-                    vprint(f"[PyRender] About to convert to pyrender...")
+                    logger.debug("Trimesh.visual.uv shape: {mesh.visual.uv.shape}")
+                    logger.debug("Trimesh.vertices shape: {mesh.vertices.shape}")
+                    logger.debug("About to convert to pyrender...")
                 else:
-                    vprint(f"[PyRender] Warning: No UV faces provided, cannot split vertices")
+                    logger.debug("Warning: No UV faces provided, cannot split vertices")
                     # Create mesh and fall back to default color
                     mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
                     mesh.visual.vertex_colors = np.ones((len(vertices), 4)) * [180, 180, 180, 255]
@@ -206,7 +209,7 @@ class PyRenderMeshRenderer:
 
         elif vertex_colors is not None:
             # Use vertex colors
-            vprint(f"[PyRender] Applying vertex colors: shape={vertex_colors.shape}, min={vertex_colors.min():.3f}, max={vertex_colors.max():.3f}")
+            logger.debug("Applying vertex colors: shape={vertex_colors.shape}, min={vertex_colors.min():.3f}, max={vertex_colors.max():.3f}")
 
             mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
             vertex_colors_uint8 = (vertex_colors * 255).astype(np.uint8)
@@ -215,9 +218,9 @@ class PyRenderMeshRenderer:
             if vertex_colors_uint8.shape[1] == 3:
                 alpha = np.full((len(vertex_colors_uint8), 1), 255, dtype=np.uint8)
                 vertex_colors_uint8 = np.hstack([vertex_colors_uint8, alpha])
-                vprint(f"[PyRender] Added alpha channel: shape={vertex_colors_uint8.shape}")
+                logger.debug("Added alpha channel: shape={vertex_colors_uint8.shape}")
 
-            vprint(f"[PyRender] Vertex colors uint8: min={vertex_colors_uint8.min()}, max={vertex_colors_uint8.max()}")
+            logger.debug("Vertex colors uint8: min={vertex_colors_uint8.min()}, max={vertex_colors_uint8.max()}")
             mesh.visual.vertex_colors = vertex_colors_uint8
 
         else:
@@ -294,9 +297,8 @@ class PyRenderMeshRenderer:
         from matplotlib.cm import get_cmap
         from matplotlib.colors import Normalize, TwoSlopeNorm
 
-        from .utils import vprint
 
-        vprint(f"[PyRender] {title}: Raw values: min={vertex_values.min():.6f}, max={vertex_values.max():.6f}, mean={vertex_values.mean():.6f}")
+        logger.debug("{title}: Raw values: min={vertex_values.min():.6f}, max={vertex_values.max():.6f}, mean={vertex_values.mean():.6f}")
 
         if normalize_values:
             # Normalize vertex values to [0, 1] using 95th percentile
@@ -304,13 +306,13 @@ class PyRenderMeshRenderer:
             vmin = vertex_values.min()
             vmax = np.percentile(vertex_values, percentile)
 
-            vprint(f"[PyRender] {title}: Normalizing with p{percentile}={vmax:.6f}")
+            logger.debug("{title}: Normalizing with p{percentile}={vmax:.6f}")
 
             if vmax > vmin:
                 # Clip values above percentile
                 clipped = np.clip(vertex_values, vmin, vmax)
                 normalized = (clipped - vmin) / (vmax - vmin)
-                vprint(f"[PyRender] {title}: After norm: min={normalized.min():.6f}, max={normalized.max():.6f}, mean={normalized.mean():.6f}")
+                logger.debug("{title}: After norm: min={normalized.min():.6f}, max={normalized.max():.6f}, mean={normalized.mean():.6f}")
             else:
                 normalized = np.zeros_like(vertex_values)
         elif symmetric_diverging:
@@ -318,7 +320,7 @@ class PyRenderMeshRenderer:
             vmax_abs = max(abs(vertex_values.min()), abs(vertex_values.max()))
             vmin = -vmax_abs
             vmax = vmax_abs
-            vprint(f"[PyRender] {title}: Symmetric diverging: range=[{vmin:.6f}, {vmax:.6f}]")
+            logger.debug("{title}: Symmetric diverging: range=[{vmin:.6f}, {vmax:.6f}]")
 
             # Normalize to [-1, 1] then shift to [0, 1]
             if vmax_abs > 0:
@@ -329,7 +331,7 @@ class PyRenderMeshRenderer:
             # No normalization - use raw values
             vmin = vertex_values.min()
             vmax = vertex_values.max()
-            vprint(f"[PyRender] {title}: No normalization, using raw range=[{vmin:.6f}, {vmax:.6f}]")
+            logger.debug("{title}: No normalization, using raw range=[{vmin:.6f}, {vmax:.6f}]")
 
             if vmax > vmin:
                 normalized = (vertex_values - vmin) / (vmax - vmin)

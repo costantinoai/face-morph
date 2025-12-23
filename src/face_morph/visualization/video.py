@@ -9,6 +9,11 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
+from face_morph.utils.logging import get_logger
+
+# Get logger for this module
+logger = get_logger(__name__)
+
 
 def create_video_from_frames(
     frame_dir: Path,

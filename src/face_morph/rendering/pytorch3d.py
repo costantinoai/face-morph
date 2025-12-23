@@ -22,7 +22,10 @@ from pytorch3d.renderer import (
     TexturesVertex,
     TexturesUV,
 )
-from .utils import vprint
+from face_morph.utils.logging import get_logger
+
+# Get logger for this module
+logger = get_logger(__name__)
 
 
 class MeshRenderer3D:
@@ -241,7 +244,7 @@ class MeshRenderer3D:
         Returns:
             List of RGB images as numpy arrays (H, W, 3) in range [0, 255], uint8
         """
-        vprint(f"[Renderer] Batch rendering {len(meshes_list)} meshes in chunks of {chunk_size}...")
+        logger.debug(f"Batch rendering {len(meshes_list)} meshes in chunks of {chunk_size}...")
 
         all_results = []
         num_chunks = (len(meshes_list) + chunk_size - 1) // chunk_size
@@ -250,7 +253,7 @@ class MeshRenderer3D:
             start_idx = chunk_idx * chunk_size
             end_idx = min(start_idx + chunk_size, len(meshes_list))
 
-            vprint(f"[Renderer] Processing chunk {chunk_idx + 1}/{num_chunks} (meshes {start_idx}-{end_idx-1})")
+            logger.debug(f"Processing chunk {chunk_idx + 1}/{num_chunks} (meshes {start_idx}-{end_idx-1})")
 
             chunk_meshes = meshes_list[start_idx:end_idx]
             chunk_textures = textures_list[start_idx:end_idx] if textures_list else None
@@ -261,7 +264,7 @@ class MeshRenderer3D:
             # Free GPU memory after each chunk
             torch.cuda.empty_cache()
 
-        vprint(f"[Renderer] Batch rendering complete: {len(all_results)} images")
+        logger.debug(f"Batch rendering complete: {len(all_results)} images")
         return all_results
 
     def _render_mesh_chunk(

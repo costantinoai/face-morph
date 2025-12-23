@@ -14,7 +14,10 @@ from typing import List, Tuple, Optional
 import torch
 from pytorch3d.structures import Meshes
 from .texture_io import resize_texture
-from .utils import vprint
+from face_morph.utils.logging import get_logger
+
+# Get logger for this module
+logger = get_logger(__name__)
 
 
 # ============================================================================
@@ -250,7 +253,7 @@ class MeshMorpher:
         with torch.inference_mode():
             # === JIT-COMPILED VECTORIZED MESH MORPHING ===
             # Use compiled function for automatic kernel fusion and optimization
-            vprint(f"[Morpher] Compiling vertex interpolation (first run only)...")
+            logger.debug("Compiling vertex interpolation (first run only)...")
             if self.use_amp:
                 with torch.autocast(device_type='cuda', dtype=torch.float16):
                     all_morphed_verts = _vectorized_vertex_lerp(verts1, verts2, ratio_tensor).clone()
@@ -265,7 +268,7 @@ class MeshMorpher:
                     texture2 = resize_texture(texture2, (texture1.shape[0], texture1.shape[1]))
 
                 # Use compiled function for texture batch processing
-                vprint(f"[Morpher] Compiling texture interpolation (first run only)...")
+                logger.debug("Compiling texture interpolation (first run only)...")
                 if self.use_amp:
                     with torch.autocast(device_type='cuda', dtype=torch.float16):
                         all_morphed_textures = _vectorized_texture_lerp(texture1, texture2, ratio_tensor).clone()
