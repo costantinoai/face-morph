@@ -37,6 +37,8 @@ Thumbs.db
 
 # Project-specific - DO NOT TRACK
 results/
+test_e2e/
+test_*/
 data/
 *.log
 TODO.md

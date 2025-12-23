@@ -277,7 +277,7 @@ def create_shape_displacement_visualization(
 
     vertices_np = mesh_a.verts_packed().cpu().numpy()
     faces_np = mesh_a.faces_packed().cpu().numpy()
-    is_cpu_renderer = hasattr(renderer, 'device') and renderer.device == 'cpu'
+    is_cpu_renderer = hasattr(renderer, 'device') and renderer.device.type == 'cpu'
 
     for name, disp_data, cmap, is_diverging in components:
         if is_cpu_renderer:
@@ -565,7 +565,7 @@ def create_texture_difference_visualization(
 
     # Render mesh with difference as vertex colors (like shape displacement)
     # Handle both PyTorch3D and PyRender renderers
-    if hasattr(renderer, 'device') and renderer.device == 'cpu':
+    if hasattr(renderer, 'device') and renderer.device.type == 'cpu':
         # PyRender renderer - convert to numpy
         vertices_np = mesh.verts_packed().cpu().numpy()
         faces_np = mesh.faces_packed().cpu().numpy()
@@ -740,7 +740,7 @@ def create_texture_difference_components_visualization(
 
     vertices_np = mesh.verts_packed().cpu().numpy()
     faces_np = mesh.faces_packed().cpu().numpy()
-    is_cpu_renderer = hasattr(renderer, 'device') and renderer.device == 'cpu'
+    is_cpu_renderer = hasattr(renderer, 'device') and renderer.device.type == 'cpu'
 
     for name, data, cmap, is_diverging in components:
         if is_cpu_renderer:
