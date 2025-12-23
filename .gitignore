@@ -48,13 +48,6 @@ PROFILING_*.md  # Local profiling documentation
 OPTIMIZATION_*.md  # Local optimization documentation
 README_PERFORMANCE_SECTION.md  # Template file
 
-# Docker - local development only
-.dockerignore
-Dockerfile.cpu
-Dockerfile.gpu
-docker-compose.yml
-DOCKER.md
-
 # Jupyter
 .ipynb_checkpoints/
 

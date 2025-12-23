@@ -1,0 +1,184 @@
+# Highly Optimized CPU-only Docker image for face-morph
+# Target: <3GB (from original 5.2GB = ~45% reduction)
+#
+# KEY OPTIMIZATIONS:
+# 1. Replaced Conda with pip (saves ~1.5-2GB)
+# 2. CPU-only PyTorch from official index (saves ~500MB-1GB)
+# 3. Built PyTorch3D from source via pip (saves ~500MB vs conda)
+# 4. Multi-stage build to exclude build tools from runtime
+# 5. Aggressive cleanup in same RUN layers
+# 6. Xvfb for headless rendering (most reliable for Docker CPU mode)
+#
+# Build: docker build -f Dockerfile.cpu.optimized -t face-morph:cpu-optimized .
+# Run:   docker run --rm -v $(pwd)/data:/workspace/data -v $(pwd)/results:/workspace/results face-morph:cpu-optimized morph /workspace/data/face1.fbx /workspace/data/face2.fbx --cpu
+
+# ===================================================================
+# STAGE 1: Builder - Compile dependencies and install packages
+# ===================================================================
+FROM python:3.10-slim AS builder
+
+# Avoid interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install build dependencies in a single layer
+# NOTE: These are ONLY for building, not in final image
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # C++ compiler for PyTorch3D compilation
+    build-essential \
+    g++ \
+    gcc \
+    # Git for cloning PyTorch3D
+    git \
+    # wget for potential downloads
+    wget \
+    # Cleanup in same layer to reduce size
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment (cleaner than system-wide install)
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip to latest version
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# ===================================================================
+# Install PyTorch CPU-only (meets torch>=2.0.0, torchvision>=0.15.0)
+# ===================================================================
+# Using latest stable: PyTorch 2.9.1 + torchvision 0.24.1
+# CPU-only index removes CUDA bloat (~500MB-1GB savings)
+RUN pip install --no-cache-dir \
+    torch==2.9.1 \
+    torchvision==0.24.1 \
+    --index-url https://download.pytorch.org/whl/cpu
+
+# ===================================================================
+# Install PyTorch3D dependencies (required for CPU mode too)
+# ===================================================================
+# These are needed by PyTorch3D for data structures (Meshes) and I/O
+RUN pip install --no-cache-dir \
+    "fvcore>=0.1.5" \
+    "iopath>=0.1.9"
+
+# ===================================================================
+# Install PyTorch3D from source (no conda overhead)
+# ===================================================================
+# Building from source ensures CPU compatibility
+# NOTE: This step can take 5-15 minutes and uses ~4-8GB RAM during build
+# Using latest release v0.7.9 (Nov 2024)
+# --no-build-isolation allows PyTorch3D to see already-installed torch
+RUN pip install --no-cache-dir --no-build-isolation \
+    "git+https://github.com/facebookresearch/pytorch3d.git@v0.7.9"
+
+# ===================================================================
+# Install all other dependencies from pyproject.toml
+# ===================================================================
+# Using exact version constraints to ensure compatibility
+RUN pip install --no-cache-dir \
+    "numpy>=1.24.0,<2.0" \
+    "scipy>=1.11.0" \
+    "pillow>=10.0.0" \
+    "matplotlib>=3.7.0" \
+    "scikit-image>=0.21.0" \
+    "trimesh>=3.21.0" \
+    "tqdm>=4.65.0" \
+    "click>=8.0.0" \
+    "pyrender>=0.1.45" \
+    "PyOpenGL>=3.1.0" \
+    "PyOpenGL-accelerate>=3.1.0"
+
+# ===================================================================
+# Install face-morph package
+# ===================================================================
+# Copy only necessary files for installation
+COPY src/ /tmp/face-morph/src/
+COPY pyproject.toml /tmp/face-morph/
+COPY README.md /tmp/face-morph/
+COPY LICENSE /tmp/face-morph/
+
+WORKDIR /tmp/face-morph
+RUN pip install --no-cache-dir .
+
+# ===================================================================
+# Aggressive cleanup to minimize what we copy to stage 2
+# ===================================================================
+RUN find /opt/venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
+    find /opt/venv -type f -name "*.pyc" -delete && \
+    find /opt/venv -type f -name "*.pyo" -delete && \
+    # Remove test files
+    find /opt/venv -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true && \
+    find /opt/venv -type d -name "test" -exec rm -rf {} + 2>/dev/null || true && \
+    # Remove static libraries (not needed at runtime)
+    find /opt/venv -type f -name "*.a" -delete && \
+    # Remove C/C++ headers (not needed at runtime)
+    find /opt/venv -type d -name "include" -exec rm -rf {} + 2>/dev/null || true && \
+    # Remove documentation
+    find /opt/venv -type d -name "doc" -exec rm -rf {} + 2>/dev/null || true && \
+    find /opt/venv -type d -name "docs" -exec rm -rf {} + 2>/dev/null || true && \
+    # Strip debug symbols from shared libraries
+    find /opt/venv -type f -name "*.so*" -exec strip --strip-unneeded {} \; 2>/dev/null || true
+
+# ===================================================================
+# STAGE 2: Runtime - Minimal runtime environment
+# ===================================================================
+FROM python:3.10-slim
+
+# Avoid interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install ONLY runtime dependencies (no build tools)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Blender for FBX conversion (required, ~300-500MB)
+    blender \
+    # FFmpeg for video generation (required, ~50-100MB)
+    ffmpeg \
+    # Xvfb for headless OpenGL rendering (creates virtual display)
+    # This is the most reliable solution for Docker CPU rendering
+    xvfb \
+    # OpenGL/Mesa libraries for software rendering
+    libgl1 \
+    libgl1-mesa-dri \
+    libglx0 \
+    libglx-mesa0 \
+    libglvnd0 \
+    # X11 libraries required by pyrender
+    libx11-6 \
+    libxext6 \
+    # Cleanup in same layer
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Copy Python environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Set environment variables
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    # Xvfb display configuration for headless rendering
+    DISPLAY=:99
+
+# Set working directory
+WORKDIR /workspace
+
+# Create directories for data and results
+RUN mkdir -p /workspace/data /workspace/results
+
+# Create entrypoint script to run with Xvfb
+RUN echo '#!/bin/bash\n\
+# Start Xvfb in background\n\
+Xvfb :99 -screen 0 1280x1024x24 -ac +extension GLX +render -noreset &\n\
+XVFB_PID=$!\n\
+# Wait for Xvfb to start\n\
+sleep 1\n\
+# Run face-morph command\n\
+face-morph "$@"\n\
+EXIT_CODE=$?\n\
+# Kill Xvfb\n\
+kill $XVFB_PID 2>/dev/null\n\
+exit $EXIT_CODE\n\
+' > /usr/local/bin/face-morph-xvfb && \
+chmod +x /usr/local/bin/face-morph-xvfb
+
+# Use the wrapper script as entrypoint
+ENTRYPOINT ["/usr/local/bin/face-morph-xvfb"]
+CMD ["--help"]

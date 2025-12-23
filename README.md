@@ -81,19 +81,72 @@ python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
 
 ### Docker (Recommended for Production)
 
-```bash
-# CPU mode
-docker run -v $(pwd)/data:/data -v $(pwd)/results:/results \
-  ghcr.io/costantinoai/face-morph:cpu \
-  face-morph batch /data --cpu -o /results
+#### CPU Mode (No Setup Required)
 
-# GPU mode (requires nvidia-docker)
-docker run --gpus all -v $(pwd)/data:/data -v $(pwd)/results:/results \
-  ghcr.io/costantinoai/face-morph:gpu \
-  face-morph batch /data --gpu -o /results
+```bash
+# Build locally
+docker build -f Dockerfile.cpu -t face-morph:cpu .
+
+# Run
+docker run --rm \
+  -v $(pwd)/data:/workspace/data:ro \
+  -v $(pwd)/results:/workspace/results:rw \
+  face-morph:cpu \
+  morph /workspace/data/face1.fbx /workspace/data/face2.fbx --cpu
 ```
 
-See [DOCKER.md](DOCKER.md) for detailed Docker setup.
+#### GPU Mode (Requires NVIDIA Setup)
+
+**Prerequisites:**
+- NVIDIA GPU with CUDA support
+- NVIDIA drivers installed (≥418.81.07)
+- Docker ≥19.03
+
+**1. Install NVIDIA Container Toolkit** (one-time setup)
+
+**Ubuntu/Debian:**
+```bash
+# Add NVIDIA repository
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+  sudo gpg --dearmor --batch --yes -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+  sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+# Install toolkit
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+
+# Configure Docker
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
+
+**Other distributions:** See [NVIDIA Container Toolkit Installation Guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+
+**2. Verify Installation**
+```bash
+docker run --rm --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all \
+  nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
+```
+
+You should see your GPU listed.
+
+**3. Build and Run GPU Docker**
+```bash
+# Build locally
+docker build -f Dockerfile.gpu -t face-morph:gpu .
+
+# Run with NVIDIA runtime
+docker run --rm --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all \
+  -v $(pwd)/data:/workspace/data:ro \
+  -v $(pwd)/results:/workspace/results:rw \
+  face-morph:gpu \
+  morph /workspace/data/face1.fbx /workspace/data/face2.fbx --gpu
+```
+
+**Note:** If you get `could not select device driver "" with capabilities: [[gpu]]` error, you need to install and configure the NVIDIA Container Toolkit first (step 1 above).
 
 ## Usage
 

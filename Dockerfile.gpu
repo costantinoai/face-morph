@@ -1,0 +1,205 @@
+# Highly Optimized GPU-accelerated Docker image for face-morph
+# Target: <6GB (from potential ~10-12GB with conda)
+# Requires NVIDIA GPU and NVIDIA Container Toolkit on host
+#
+# KEY OPTIMIZATIONS:
+# 1. Replaced Conda with pip (saves ~1.5-2GB)
+# 2. CUDA 12.4 PyTorch from official index (saves ~500MB vs conda)
+# 3. Built PyTorch3D from source with CUDA support (saves ~500MB vs conda)
+# 4. Multi-stage build: devel for building, runtime for final (saves ~3-5GB)
+# 5. Aggressive cleanup in same RUN layers
+#
+# ===================================================================
+# PREREQUISITES - NVIDIA Container Toolkit
+# ===================================================================
+# This Docker image requires the NVIDIA Container Toolkit to access GPUs.
+#
+# Installation (Ubuntu/Debian):
+#   1. Add NVIDIA repository:
+#      curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+#        sudo gpg --dearmor --batch --yes -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+#      curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+#        sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+#        sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+#
+#   2. Install toolkit:
+#      sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+#
+#   3. Configure Docker runtime:
+#      sudo nvidia-ctk runtime configure --runtime=docker
+#      sudo systemctl restart docker
+#
+#   4. Verify installation:
+#      docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
+#
+# See: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+#
+# ===================================================================
+# USAGE
+# ===================================================================
+# Build: docker build -f Dockerfile.gpu.optimized -t face-morph:gpu-optimized .
+# Run:   docker run --rm --gpus all -v $(pwd)/data:/workspace/data -v $(pwd)/results:/workspace/results face-morph:gpu-optimized morph /workspace/data/face1.fbx /workspace/data/face2.fbx --gpu
+
+# ===================================================================
+# STAGE 1: Builder - Compile PyTorch3D with CUDA support
+# ===================================================================
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04 AS builder
+
+# Avoid interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Python and build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Python 3.10
+    python3.10 \
+    python3.10-dev \
+    python3-pip \
+    python3.10-venv \
+    # Build tools (required for PyTorch3D compilation)
+    build-essential \
+    cmake \
+    git \
+    wget \
+    ninja-build \
+    # Cleanup in same layer
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Set Python 3.10 as default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
+
+# Create virtual environment (cleaner than system-wide)
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# ===================================================================
+# Install PyTorch with CUDA 12.4 support
+# ===================================================================
+# Using PyTorch 2.5.1 with CUDA 12.4 (latest stable with cu124)
+# Meets requirements: torch>=2.0.0, torchvision>=0.15.0
+RUN pip install --no-cache-dir \
+    torch==2.5.1 \
+    torchvision==0.20.1 \
+    torchaudio==2.5.1 \
+    --index-url https://download.pytorch.org/whl/cu124
+
+# ===================================================================
+# Install PyTorch3D dependencies
+# ===================================================================
+RUN pip install --no-cache-dir \
+    "fvcore>=0.1.5" \
+    "iopath>=0.1.9"
+
+# ===================================================================
+# Build PyTorch3D from source with CUDA support
+# ===================================================================
+# This is the most time-consuming step (10-20 minutes)
+# Requires CUDA compiler (nvcc) which is why we use -devel base
+ENV FORCE_CUDA=1
+ENV TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6;8.9;9.0"
+
+RUN pip install --no-cache-dir --no-build-isolation \
+    "git+https://github.com/facebookresearch/pytorch3d.git@v0.7.9"
+
+# ===================================================================
+# Install all other dependencies
+# ===================================================================
+RUN pip install --no-cache-dir \
+    "numpy>=1.24.0,<2.0" \
+    "scipy>=1.11.0" \
+    "pillow>=10.0.0" \
+    "matplotlib>=3.7.0" \
+    "scikit-image>=0.21.0" \
+    "trimesh>=3.21.0" \
+    "tqdm>=4.65.0" \
+    "click>=8.0.0" \
+    "pyrender>=0.1.45"
+
+# ===================================================================
+# Install face-morph package
+# ===================================================================
+COPY src/ /tmp/face-morph/src/
+COPY pyproject.toml /tmp/face-morph/
+COPY README.md /tmp/face-morph/
+COPY LICENSE /tmp/face-morph/
+
+WORKDIR /tmp/face-morph
+RUN pip install --no-cache-dir .[cuda]
+
+# ===================================================================
+# Aggressive cleanup to minimize what we copy to stage 2
+# ===================================================================
+RUN find /opt/venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
+    find /opt/venv -type f -name "*.pyc" -delete && \
+    find /opt/venv -type f -name "*.pyo" -delete && \
+    # Remove test files
+    find /opt/venv -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true && \
+    find /opt/venv -type d -name "test" -exec rm -rf {} + 2>/dev/null || true && \
+    # Remove static libraries (not needed at runtime)
+    find /opt/venv -type f -name "*.a" -delete && \
+    # Remove C/C++ headers (not needed at runtime)
+    find /opt/venv -type d -name "include" -exec rm -rf {} + 2>/dev/null || true && \
+    # Remove documentation
+    find /opt/venv -type d -name "doc" -exec rm -rf {} + 2>/dev/null || true && \
+    find /opt/venv -type d -name "docs" -exec rm -rf {} + 2>/dev/null || true && \
+    # Strip debug symbols from shared libraries (careful with CUDA libs)
+    find /opt/venv -type f -name "*.so*" ! -path "*/nvidia/*" -exec strip --strip-unneeded {} \; 2>/dev/null || true
+
+# ===================================================================
+# STAGE 2: Runtime - Minimal GPU runtime environment
+# ===================================================================
+# Using runtime image instead of devel saves ~3-5GB
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+# Avoid interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install ONLY runtime dependencies (no build tools, no CUDA devel)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Python runtime
+    python3.10 \
+    python3-pip \
+    # Blender for FBX conversion (required, ~300-500MB)
+    blender \
+    # FFmpeg for video generation (required, ~50-100MB)
+    ffmpeg \
+    # OpenGL/EGL runtime libraries
+    libgl1 \
+    libglu1-mesa \
+    libegl1-mesa \
+    # X11 libraries (may be needed for some GL operations)
+    libx11-6 \
+    libxext6 \
+    libxrender1 \
+    # Cleanup in same layer
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Set Python 3.10 as default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
+
+# Copy Python environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Set environment variables
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    # CUDA environment
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+
+# Set working directory
+WORKDIR /workspace
+
+# Create directories
+RUN mkdir -p /workspace/data /workspace/results
+
+# Use the installed face-morph CLI
+ENTRYPOINT ["face-morph"]
+CMD ["--help"]

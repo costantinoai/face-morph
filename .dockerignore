@@ -1,0 +1,84 @@
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Data and results (don't include in image, mount as volumes)
+data/
+results/
+*.fbx
+*.obj
+*.mtl
+*.png
+*.jpg
+*.jpeg
+*.mp4
+*.avi
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Environment files
+.env
+.env.*
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Testing
+tests/
+test_*.py
+
+# Scripts (unless needed in container)
+scripts/
+*.sh
+!entrypoint.sh
+
+# Conda/pip
+environment.yml
+requirements.txt
