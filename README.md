@@ -1,510 +1,306 @@
-# 3D Face Morphing Pipeline
+# Face Morph
 
-**Clean, modular, production-ready 3D face morphing with GPU acceleration**
+**Production-ready 3D face morphing with GPU acceleration**
 
-## Overview
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-This repository provides a simple, IDE-friendly pipeline for morphing 3D face meshes with optional texture interpolation. Built with PyTorch3D for GPU acceleration, following SOLID principles for easy maintenance.
+A clean, modular Python package for morphing 3D face meshes with advanced heatmap visualization and quantitative analysis. Built with PyTorch3D for GPU acceleration, following modern Python packaging standards.
 
-### Key Features
+---
 
-✅ **3D Mesh Rendering**: Renders morphed 3D meshes to 2D images with proper lighting
-✅ **Displacement Heatmaps**: Visualizes signed shape displacement (expansion/contraction) and texture differences with diverging colormaps
-✅ **Video Animation**: Generates MP4 videos from morph sequences (30 fps)
-✅ **Fine-Grained Morphs**: 41 frames (0-100% in 2.5% increments)
-✅ **FBX Export**: Industry-standard mesh format with embedded textures
-✅ **Session Logging**: Complete logs saved for each pair
-✅ **Dual-Mode**: CLI for automation, IDE-friendly for development
-✅ **Batch Processing**: Automatically morph all unique pairs in a folder
-✅ **Auto-Detection**: Morphs shape+texture when both available, shape-only otherwise
-✅ **GPU Accelerated**: Morphing 10-20x faster on GPU, rendering on CPU
-✅ **Clean Code**: SOLID principles, DRY, single-responsibility functions
+## ✨ Key Features
 
-## Quick Start
+- 🎨 **Advanced Heatmap Visualization** - 3-component shape displacement (normal/tangent/total) and 3-component texture analysis (luminance/chroma/perceptual)
+- 📊 **Quantitative Analysis** - Export CSV data for statistical analysis in Excel, R, MATLAB, or Python
+- ⚡ **GPU Accelerated** - 10-20x faster morphing on GPU with mixed precision (FP16)
+- 🎬 **Video Generation** - Create MP4 animations from morph sequences
+- 📦 **Pip Installable** - Standard Python package with CPU and GPU support
+- 🖥️ **User-Friendly CLI** - Simple commands for single pairs or batch processing
+- 🔧 **Two Output Modes** - Fast mode (PNG + heatmaps) or Full mode (PNG + heatmaps + meshes + video + CSV)
+- 🏭 **Production Ready** - Clean architecture, structured logging, comprehensive error handling
 
-### 1. Installation
+---
 
-**Automatic Installation (Recommended)**
+## 📋 Quick Start
 
-Run the installation script - it automatically detects your GPU and installs the correct packages:
+### Installation
+
+**CPU-only (recommended for most users):**
+```bash
+pip install -e .
+```
+
+**GPU with CUDA support:**
+```bash
+pip install -e .[cuda]
+# Then follow prompts to install PyTorch3D with CUDA
+```
+
+See [docs/installation.md](docs/installation.md) for detailed installation instructions.
+
+### Basic Usage
 
 ```bash
-./install.sh
+# Fast mode (PNG + heatmaps, ~5-10 min)
+face-morph morph face1.fbx face2.fbx
+
+# Full mode (PNG + heatmaps + meshes + video + CSV, ~2 hours)
+face-morph morph face1.fbx face2.fbx --full --gpu
+
+# Batch process all faces in folder
+face-morph batch data/faces/ --full --gpu
 ```
 
-The script will:
-- ✅ Detect NVIDIA GPU (if available)
-- ✅ Install PyTorch with correct CUDA support
-- ✅ Build PyTorch3D from source **with GPU rendering**
-- ✅ Install all dependencies (matplotlib, pillow, etc.)
-- ✅ Verify GPU rendering support
+See [docs/usage.md](docs/usage.md) for complete usage examples.
 
-**⚠️ IMPORTANT: CUDA Version Matching**
+---
 
-PyTorch3D compilation requires that the CUDA compiler (`cuda-nvcc`) version **exactly matches** the CUDA version PyTorch was compiled with.
+## 🎯 Output Modes
 
-- PyTorch 2.4.1 is compiled with **CUDA 12.4**
-- Therefore, `cuda-nvcc` must be **12.4.x** (not 13.x or 11.x)
-- This is enforced in `environment.yml` with: `cuda-nvcc=12.4.*`
+### Default Mode (Fast) - ~5-10 minutes
 
-The installation script handles this automatically. If installing manually, ensure CUDA versions match!
+Perfect for quick visualization and iteration:
 
-**Manual Installation (Alternative)**
+- ✅ **41 PNG images** - Rendered morph sequence (512×512)
+- ✅ **6 heatmap visualizations:**
+  - Shape: normal displacement, tangent displacement, total displacement
+  - Texture: luminance difference, chrominance difference, perceptual difference (ΔE)
+- ✅ **Session log** - Complete processing log
 
-<details>
-<summary>Click to expand manual installation steps</summary>
+### Full Mode (Complete) - ~80-120 minutes
+
+Complete research output for publication:
+
+- ✅ **Everything from default mode**, plus:
+- ✅ **41 OBJ meshes** - For external 3D analysis
+- ✅ **41 FBX meshes** - Industry-standard format with embedded textures
+- ✅ **MP4 animation** - 30 fps video of morph sequence
+- ✅ **3 CSV files** for quantitative analysis:
+  - `statistics.csv` - Summary metrics (mean, std, percentiles)
+  - `vertex_displacements.csv` - Per-vertex displacement data
+  - `texture_differences.csv` - Per-pixel texture metrics
+
+---
+
+## 📊 Heatmap Visualizations
+
+### Shape Displacement Components
+
+The pipeline generates **3 complementary shape heatmaps** for comprehensive analysis:
+
+1. **Normal Displacement** (signed) - Expansion/contraction perpendicular to surface
+   - Red: outward movement (fuller features)
+   - Blue: inward movement (thinner features)
+   - White: no depth change
+
+2. **Tangent Displacement** (unsigned) - Sliding movement parallel to surface
+   - Magnitude of lateral movement
+
+3. **Total Displacement** (unsigned) - Overall 3D movement
+   - Euclidean distance in 3D space
+
+### Texture Difference Components
+
+If textures are available, generates **3 texture analysis heatmaps**:
+
+1. **Luminance Difference** (signed) - Brightness changes
+2. **Chrominance Difference** (unsigned) - Color changes
+3. **Perceptual Difference** (unsigned) - Industry-standard CIEDE2000 metric
+
+See [docs/heatmaps.md](docs/heatmaps.md) for detailed methodology and interpretation.
+
+---
+
+## 📦 Package Structure
+
+```
+face-morph/
+├── src/face_morph/          # Main package
+│   ├── core/                # Core algorithms (morphing, I/O)
+│   ├── rendering/           # Renderer abstraction (PyTorch3D/PyRender)
+│   ├── visualization/       # Heatmaps, video, CSV export
+│   ├── pipeline/            # Orchestration and configuration
+│   ├── cli/                 # Command-line interface
+│   └── utils/               # Logging, parallelization, context managers
+├── docs/                    # Documentation
+├── scripts/                 # Helper scripts
+├── tests/                   # Test suite
+└── pyproject.toml           # Package configuration
+```
+
+---
+
+## 🚀 CLI Commands
+
+### Single Pair Morphing
 
 ```bash
-# Create environment
-conda create -n face-morph python=3.10
-conda activate face-morph
+# Basic usage (default mode)
+face-morph morph input1.fbx input2.fbx
 
-# Install PyTorch with CUDA 12.4 (or cpuonly for CPU-only systems)
-conda install pytorch==2.4.1 torchvision pytorch-cuda=12.4 -c pytorch -c nvidia
+# Full output with GPU acceleration
+face-morph morph input1.fbx input2.fbx --full --gpu
 
-# CRITICAL: Install CUDA compiler matching PyTorch CUDA version
-conda install cuda-nvcc=12.4.* cuda-toolkit -c nvidia -c conda-forge
+# Custom output directory
+face-morph morph face1.obj face2.obj -o custom_results/
 
-# Install dependencies
-conda install -c fvcore -c iopath -c conda-forge fvcore iopath pillow matplotlib
-
-# Build PyTorch3D from source with GPU support
-export CUDA_HOME=$CONDA_PREFIX
-FORCE_CUDA=1 pip install --no-build-isolation "git+https://github.com/facebookresearch/pytorch3d.git"
-
-# Install ffmpeg (for video creation)
-sudo apt install ffmpeg  # Ubuntu/Debian
-# or: brew install ffmpeg  # macOS
-
-# Install Blender (for FBX export)
-sudo snap install blender --classic  # Ubuntu
-# or: brew install --cask blender  # macOS
+# CPU mode with debug logging
+face-morph morph face1.fbx face2.fbx --cpu --log-level DEBUG
 ```
 
-</details>
-
-**GPU vs CPU Performance**
-
-This pipeline uses a hybrid approach:
-- **Morphing (shape + texture interpolation)**: GPU-accelerated with mixed precision → ~0.5 seconds for 41 morphs
-- **Rendering (3D mesh → 2D images)**: CPU-based for reliability → ~2-3 minutes per frame
-
-For 41 frames:
-- Morphing: < 1 second (GPU)
-- Rendering: ~80-120 minutes (CPU)
-- FBX export: ~5-10 minutes (parallel)
-- Video encoding: ~10 seconds
-
-**Why CPU rendering?** PyTorch3D GPU rendering requires complex CUDA compilation. CPU rendering is slower but guaranteed to work and produces identical results.
-
-</details>
-
-### 2. Usage
-
-**Option A: CLI (Recommended)**
+### Batch Processing
 
 ```bash
-# Single pair
-./morph -i1 data/face1.fbx -i2 data/face2.fbx --gpu
+# Process all unique pairs in folder (default mode)
+face-morph batch data/faces/
 
-# Batch mode - process all unique pairs in folder
-./morph --batch data/ --gpu
+# Full mode with GPU
+face-morph batch data/faces/ --full --gpu
 
-# Custom ratios
-./morph -i1 face1.fbx -i2 face2.fbx --ratios "0.9,0.1 0.5,0.5 0.1,0.9"
-
-# CPU mode
-./morph -i1 face1.fbx -i2 face2.fbx --no-gpu
-
-# See all options
-./morph --help
+# Custom output directory
+face-morph batch data/ -o batch_results/
 ```
 
-**Batch Mode Details:**
-- Automatically discovers all mesh files (FBX/OBJ) in folder
-- Creates all unique pairs (excludes self-pairs like a-a)
-- Treats pairs as unordered (a-b same as b-a)
-- Prefers FBX over OBJ when both exist
-- Example: 3 faces → 3 pairs (1+2, 1+3, 2+3)
+### Help
 
-**Option B: IDE (Edit configuration in `run.py`)**
+```bash
+# General help
+face-morph --help
+
+# Command-specific help
+face-morph morph --help
+face-morph batch --help
+```
+
+---
+
+## 🐍 Python API
+
+For programmatic access:
 
 ```python
-# Edit DEFAULT_CONFIG in run.py:
-DEFAULT_CONFIG = {
-    'input_mesh_1': 'data/face1.fbx',
-    'input_mesh_2': 'data/face2.fbx',
-    'output_dir': 'results',
-    'use_gpu': True,
-    ...
-}
+import torch
+from pathlib import Path
+from face_morph.pipeline import MorphConfig, run_morphing_pipeline
+
+# Configure morphing
+config = MorphConfig(
+    input_mesh_1=Path("face1.fbx"),
+    input_mesh_2=Path("face2.fbx"),
+    output_mode="full",  # or "default"
+    device=torch.device('cuda'),  # or 'cpu'
+    verbose=True
+)
+
+# Run pipeline
+output_dir = run_morphing_pipeline(config)
+print(f"Results saved to: {output_dir}")
 ```
 
-Then run:
-- **PyCharm**: Ctrl+Shift+F10
-- **VSCode**: F5
-- **Terminal**: `conda run -n pytorch3d python run.py`
+See [docs/usage.md](docs/usage.md) for complete API examples.
 
-## Project Structure
+---
 
-```
-├── run.py                 # Main script (IDE-friendly, no main())
-├── lib/                   # Modular library components
-│   ├── __init__.py        # Package exports
-│   ├── validator.py       # Input validation
-│   ├── converter.py       # FBX→OBJ conversion
-│   ├── mesh_io.py         # Mesh loading/saving
-│   ├── texture_io.py      # Texture loading/saving
-│   └── morpher.py         # Core morphing algorithms
-├── data/                  # Input meshes (FBX or OBJ)
-├── results/               # Output (timestamped subdirs)
-└── legacy/                # Old CLI scripts (deprecated)
-```
-
-### Design Principles
-
-**SOLID Architecture:**
-- **Single Responsibility**: Each module has one job
-- **Open/Closed**: Extend via new modules, don't modify core
-- **Liskov Substitution**: Components are interchangeable
-- **Interface Segregation**: Minimal, focused interfaces
-- **Dependency Inversion**: Depend on abstractions
-
-**Code Quality:**
-- ✅ **DRY**: No code duplication
-- ✅ **Low Cognitive Effort**: Easy to read and understand
-- ✅ **Type Safety**: Full type hints
-- ✅ **Clear Names**: Self-documenting function names
-
-## How It Works
-
-### 1. Automatic Texture Detection
-
-```python
-# Automatically detects texture availability
-if both_have_textures:
-    morph_shape_and_texture()
-elif one_has_texture:
-    warn_and_morph_shape_only()
-else:
-    morph_shape_only()
-```
-
-### 2. Smart FBX Handling
-
-```python
-# Automatically converts FBX to OBJ if needed
-if file.suffix == '.fbx':
-    obj_file = convert_fbx_to_obj(file)  # Uses Blender
-else:
-    obj_file = file  # Already OBJ
-```
-
-### 3. GPU-Optimized Morphing
-
-```python
-# Uses torch.lerp() for efficient GPU interpolation
-morphed_verts = torch.lerp(verts1, verts2, ratio)  # On GPU
-morphed_texture = torch.lerp(tex1, tex2, ratio)    # On GPU
-```
-
-## Heatmap Visualizations
-
-The pipeline automatically generates two heatmaps that visualize differences between face pairs:
-
-### 1. Shape Displacement Heatmap
-
-**What it measures:** Signed displacement along surface normal (expansion/contraction)
-
-**Metric:**
-```python
-displacement_vector = V_B - V_A          # 3D vector for each vertex
-surface_normal = mesh_normal(V_A)        # Perpendicular to surface
-signed_displacement = displacement_vector · surface_normal  # Dot product
-```
-
-**Interpretation:**
-- **Red (positive)**: Surface moved **outward** - face expanding/getting fuller (e.g., fuller cheeks, protruding forehead)
-- **White (zero)**: No normal displacement - surface stayed at same depth (may still move sideways)
-- **Blue (negative)**: Surface moved **inward** - face contracting/getting thinner (e.g., recessed chin, sunken cheeks)
-
-**Colorbar:** Diverging (`coolwarm`), centered at 0, shows actual displacement values (no normalization)
-
-**Example values (male1 vs male2):**
-```
-Min:     -0.027098 (inward)   - 2.7cm contraction at deepest point
-Max:     +0.044384 (outward)  - 4.4cm expansion at highest point
-Mean:    +0.012124            - Slight overall expansion
-Median:  +0.010567
-P90:     +0.035211            - 90% of vertices within ±3.5cm
-```
-
-**Statistics displayed:**
-- Min, Max, Mean, Median, Std Dev
-- P10, P90, P95, P99 percentiles
-- Interpretation guide
-
-**Why this metric?**
-- **Better than Euclidean distance**: A vertex moving 5cm parallel to the surface (e.g., sideways) shows as white (0 normal displacement), not bright yellow. This focuses on depth changes, not overall movement.
-- **Directional information**: Unlike magnitude-only metrics, this tells you if features are expanding or contracting
-- **Anatomically meaningful**: Maps to how faces actually change (fuller vs thinner features)
-
-### 2. Texture Difference Heatmap
-
-**What it measures:** Signed brightness/color difference between textures
-
-**Metric:**
-```python
-diff = T_B - T_A                    # Element-wise difference per pixel
-diff_map = mean(diff, axis=RGB)     # Average across R, G, B channels
-# Map from 2D texture space to 3D mesh vertices using UV coordinates
-```
-
-**Interpretation:**
-- **Red (positive)**: Texture B is **brighter/lighter** than texture A
-- **White (zero)**: No color difference - identical appearance
-- **Blue (negative)**: Texture A is **brighter/lighter** than texture B
-
-**Colorbar:** Diverging (`coolwarm`), centered at 0, shows actual difference in [0, 1] RGB scale
-
-**Example values (male1 vs male2):**
-```
-Min:     -0.684303 (A brighter)  - Male1 much lighter in this region
-Max:     +0.696193 (B brighter)  - Male2 much lighter in this region
-Mean:    +0.020518               - Male2 slightly brighter overall
-Median:  +0.015234
-P90:     +0.195432               - 90% of differences within ±0.2
-```
-
-**Note:** Background pixels (nearly black in both textures) are masked to 0 to avoid showing unused texture space.
-
-### Heatmap Output Files
-
-```
-results/TIMESTAMP/face1_face2/
-├── shape_displacement_heatmap.png    # 3D mesh colored by signed normal displacement
-└── texture_difference_heatmap.png    # 3D mesh colored by signed texture difference
-```
-
-### When Are Heatmaps Useful?
+## 🔬 Use Cases
 
 **Research Applications:**
-- **Face perception studies**: Identify which facial features change most between stimuli
-- **Morphing validation**: Verify that morphs are changing in expected ways
-- **Feature analysis**: Quantify shape vs appearance changes separately
+- Face perception studies
+- Morphing stimulus generation
+- Quantitative feature analysis
+- Shape vs appearance comparison
 
-**Troubleshooting:**
-- **All red/blue heatmap**: Faces are very different - check if you selected correct pair
-- **All white heatmap**: Faces are nearly identical - check if meshes were accidentally duplicated
-- **Unexpected patterns**: May indicate mesh alignment issues or topology mismatches
+**Production Applications:**
+- Character animation
+- Face aging simulation
+- Medical visualization
+- Game asset generation
 
-### Technical Details
+---
 
-**Shape displacement uses:**
-- Surface normals computed via PyTorch3D's `verts_normals_packed()`
-- Dot product projects 3D displacement onto normal direction
-- No normalization - shows actual measurement values
+## 📈 Performance
 
-**Texture difference uses:**
-- Bilinear sampling to map 2D texture → 3D vertices via UV coordinates
-- Background masking (pixels < 0.1 brightness in both textures)
-- Signed difference preserves directionality
-
-**Rendering:**
-- **CPU mode**: PyRender with OpenGL (fast, reliable)
-- **GPU mode**: PyTorch3D with unlit lighting (preserves exact vertex colors)
-- Both use diverging colormaps centered at 0 for signed values
-
-## Output Structure
-
-Each run creates a timestamped directory with pair-based subfolders:
-
-```
-results/
-└── 20251222_193537/              # Timestamp
-    └── male1_male2/               # Pair folder
-        ├── session.log                      # Complete session log
-        ├── png/                             # Rendered 3D mesh frames
-        │   ├── male1-0000_male2-1000.png   # Frame 1 (0%) - 3D rendered
-        │   ├── male1-0025_male2-0975.png   # Frame 2 (2.5%) - 3D rendered
-        │   ├── male1-0050_male2-0950.png   # Frame 3 (5%) - 3D rendered
-        │   ├── ...                         # 41 frames total
-        │   └── male1-1000_male2-0000.png   # Frame 41 (100%) - 3D rendered
-        ├── mesh/                             # FBX mesh files
-        │   ├── male1-0000_male2-1000.fbx
-        │   ├── male1-0025_male2-0975.fbx
-        │   └── ...
-        ├── animation.mp4                     # Video animation (30 fps)
-        ├── shape_displacement_heatmap.png    # Shape change visualization (signed normal displacement)
-        └── texture_difference_heatmap.png    # Texture change visualization (signed color difference, if textured)
-```
-
-**Frame Details:**
-- **41 frames total**: From 0-1000 to 1000-0 in steps of 25
-- **Permille notation**: `stim1-XXX_stim2-YYY` where XXX, YYY ∈ [0, 1000]
-- **Example**: `male1-750_male2-250` = 75% male1 + 25% male2
-- **Video**: All frames combined into MP4 at 30 fps
-
-## Configuration Options
-
-Edit in `run.py`:
-
-```python
-# Inputs
-INPUT_MESH_1 = "data/face1.fbx"    # Or .obj
-INPUT_MESH_2 = "data/face2.fbx"    # Or .obj
-
-# Outputs
-OUTPUT_DIR = "results"
-
-# Morph ratios (ratio1, ratio2)
-MORPH_RATIOS = [
-    (0.9, 0.1),  # 90% mesh1 + 10% mesh2
-    (0.5, 0.5),  # 50% + 50%
-    (0.1, 0.9),  # 10% + 90%
-]
-
-# GPU settings
-USE_GPU = True                  # False for CPU
-USE_MIXED_PRECISION = True      # FP16 for 2-3x speedup
-
-# Misc
-BLENDER_PATH = "blender"        # For FBX conversion
-VERBOSE = True                  # Progress messages
-```
-
-## Library API
-
-### Validator
-
-```python
-from lib import validate_input_file, validate_device, validate_ratios
-
-filepath = validate_input_file("data/mesh.fbx")  # Validates existence + format
-device = validate_device("cuda")                  # Validates CUDA availability
-ratios = validate_ratios([(0.5, 0.5)])           # Validates ratio tuples
-```
-
-### Converter
-
-```python
-from lib import convert_fbx_to_obj
-
-success = convert_fbx_to_obj(
-    fbx_path=Path("input.fbx"),
-    obj_path=Path("output.obj"),
-    blender_path="blender"
-)
-```
-
-### Mesh I/O
-
-```python
-from lib import load_mesh, save_mesh
-
-# Load
-mesh, aux_data = load_mesh(filepath, device)
-# aux_data contains: verts_uvs, texture_images, normals, counts
-
-# Save
-save_mesh(mesh, output_path, verts_uvs, texture_map)
-```
-
-### Texture I/O
-
-```python
-from lib import load_texture, save_texture, has_texture
-
-# Check availability
-if has_texture(aux_data):
-    texture = load_texture(aux_data, device)  # Returns tensor or None
-    save_texture(texture, Path("output.png"))
-```
-
-### Morpher
-
-```python
-from lib import create_morpher
-
-morpher = create_morpher(device, use_amp=True)
-
-# Single morph
-mesh, texture = morpher.morph(mesh1, mesh2, tex1, tex2, ratio1, ratio2)
-
-# Batch morph (efficient)
-results = morpher.batch_morph(mesh1, mesh2, tex1, tex2, ratios)
-```
-
-## Performance
-
-| Operation | CPU | GPU (RTX 3080) |
-|-----------|-----|----------------|
-| 5 morphs (shape only) | ~6s | ~0.7s (**8x faster**) |
-| 5 morphs (shape + texture) | ~8s | ~1.2s (**6x faster**) |
-| 41 morphs (batch) | ~50s | ~5s (**10x faster**) |
+| Operation | CPU | GPU (CUDA) | Speedup |
+|-----------|-----|------------|---------|
+| Morphing (41 frames) | ~50s | ~5s | **10x** |
+| Heatmap generation | ~30s | ~10s (parallel) | **3x** |
+| FBX conversion (41 files) | ~60s | ~12s (parallel) | **5x** |
 
 **GPU Benefits:**
-- Mixed precision (FP16): 2-3x speedup
-- Parallel texture interpolation
-- Batched operations
-- Strategic memory management
+- Mixed precision (FP16) for 2-3x faster computation
+- Parallel batch operations
+- Efficient memory management
 
-## Troubleshooting
+---
 
-### "CUDA not available"
+## 🛠️ Requirements
 
-```bash
-# Check GPU
-nvidia-smi
+**Minimum:**
+- Python 3.9+
+- 8GB RAM
+- 2GB disk space
 
-# Verify PyTorch CUDA
-python -c "import torch; print(torch.cuda.is_available())"
+**Recommended:**
+- Python 3.10+
+- 16GB RAM
+- NVIDIA GPU with 4GB+ VRAM
+- CUDA 12.4
 
-# If False, reinstall PyTorch with CUDA
-conda install pytorch pytorch-cuda=12.4 -c pytorch -c nvidia
-```
+**External Dependencies:**
+- Blender (for FBX export) - `sudo snap install blender --classic`
+- FFmpeg (for video creation) - `sudo apt install ffmpeg`
 
-### "Meshes have different topology"
+---
 
-Morphing requires identical vertex counts. Use meshes with same topology or use remeshing tools.
+## 📚 Documentation
 
-### "Blender not found"
+- [Installation Guide](docs/installation.md) - Detailed CPU and GPU installation
+- [Usage Guide](docs/usage.md) - CLI and API examples
+- [Heatmap Documentation](docs/heatmaps.md) - Calculation methodology and interpretation
 
-Set `BLENDER_PATH = "/path/to/blender"` in `run.py`
+---
 
-## Contributing
+## 🤝 Contributing
 
-This is a clean, modular codebase. To contribute:
+This is a clean, modular codebase following SOLID principles:
 
-1. **Follow SOLID principles**
-2. **Keep functions single-responsibility**
-3. **Add type hints**
-4. **Update `/lib` modules, don't modify `run.py` logic**
-5. **Test with both shape-only and shape+texture cases**
+1. Follow existing code style and structure
+2. Add type hints to all functions
+3. Write comprehensive docstrings
+4. Test with both CPU and GPU modes
+5. Update documentation as needed
 
-## License
+---
 
-MIT License - See LICENSE file
+## 📄 License
 
-## Citation
+MIT License - See [LICENSE](LICENSE) file
+
+---
+
+## 📧 Citation
+
+If you use this package in your research, please cite:
 
 ```bibtex
 @software{face_morph_2025,
   author = {costantinoai},
-  title = {3D Face Morphing Pipeline},
+  title = {Face Morph: Production-ready 3D Face Morphing with GPU Acceleration},
   year = {2025},
   url = {https://github.com/costantinoai/face-morph-laura}
 }
 ```
 
-## Legacy Scripts
+---
 
-Old CLI-based scripts moved to `/legacy` folder:
-- `morph.py` - Unified CLI with --gpu flag
-- `run_batch_morph.py` - Blender batch processing
-- `pytorch_batch_morph.py` - PyTorch batch processing
+## 🙏 Acknowledgments
 
-**Recommendation:** Use `run.py` for new projects (cleaner, more maintainable)
+Built with:
+- [PyTorch3D](https://pytorch3d.org/) - 3D deep learning framework
+- [PyRender](https://pyrender.readthedocs.io/) - OpenGL-based mesh rendering
+- [Click](https://click.palletsprojects.com/) - CLI framework
+- [scikit-image](https://scikit-image.org/) - Perceptual color metrics
 
 ---
 
