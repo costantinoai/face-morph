@@ -40,12 +40,22 @@ Results saved to `results/YYYYMMDD_HHMMSS/face1_face2/`
 
 - **Python 3.9+**
 - **Conda** (recommended) or pip/venv
-- **Blender** - for FBX to OBJ conversion
-- **FFmpeg** - for video generation (optional)
+- **Blender** - for FBX to OBJ conversion (auto-detected)
+- **FFmpeg** - for video generation (optional, auto-detected)
 
-### CPU-Only Installation
+### Platform Support
 
-Suitable for most users. Uses PyRender (OpenGL-based) for fast CPU rendering.
+| Platform | CPU Mode | GPU Mode (CUDA) | Notes |
+|----------|----------|-----------------|-------|
+| **Linux** | ✅ Full support | ✅ Full support | Best platform for GPU acceleration |
+| **Windows** | ✅ Full support | ⚠️ Advanced setup | PyTorch3D requires Visual Studio Build Tools |
+| **macOS** | ✅ Full support | ❌ Not supported | Apple dropped NVIDIA/CUDA support in 2018 |
+
+---
+
+### Quick Install (All Platforms)
+
+**CPU-Only Mode** (Recommended for beginners):
 
 ```bash
 # 1. Clone repository
@@ -63,9 +73,43 @@ pip install -e .
 face-morph --help
 ```
 
-### GPU Installation (CUDA)
+**Note**: Blender and FFmpeg are auto-detected. Install them separately (see platform-specific sections below).
 
-For GPU-accelerated rendering with PyTorch3D. Requires NVIDIA GPU with CUDA 12.4.
+---
+
+### Platform-Specific Installation
+
+<details>
+<summary><b>🐧 Linux (Ubuntu/Debian)</b></summary>
+
+#### CPU-Only Installation
+
+```bash
+# 1. Clone repository
+git clone https://github.com/costantinoai/face-morph.git
+cd face-morph
+
+# 2. Create environment
+conda create -n face-morph python=3.10
+conda activate face-morph
+
+# 3. Install package
+pip install -e .
+
+# 4. Install Blender (required)
+sudo snap install blender --classic
+# or: sudo apt install blender
+
+# 5. Install FFmpeg (optional, for video generation)
+sudo apt install ffmpeg
+
+# 6. Verify
+face-morph --help
+```
+
+#### GPU Installation (CUDA)
+
+Requires NVIDIA GPU with CUDA 12.4.
 
 ```bash
 # 1. Create environment
@@ -81,44 +125,138 @@ pip install -e .[cuda]
 # 4. Install PyTorch3D
 FORCE_CUDA=1 pip install --no-build-isolation "git+https://github.com/facebookresearch/pytorch3d.git"
 
-# 5. Verify
+# 5. Install Blender and FFmpeg
+sudo snap install blender --classic
+sudo apt install ffmpeg
+
+# 6. Verify GPU
 python -c "import torch; print('CUDA available:', torch.cuda.is_available())"
 python -c "import pytorch3d; print('PyTorch3D OK')"
 ```
 
-### Install External Tools
+</details>
 
-**Blender** (required for FBX conversion):
+<details>
+<summary><b>🍎 macOS (Intel & Apple Silicon)</b></summary>
+
+#### CPU-Only Installation (ONLY option for macOS)
+
+⚠️ **IMPORTANT**: macOS does NOT support CUDA. Apple dropped NVIDIA support in 2018.
+You can only use CPU mode on macOS.
 
 ```bash
-# Ubuntu/Debian
-sudo snap install blender --classic
+# 1. Clone repository
+git clone https://github.com/costantinoai/face-morph.git
+cd face-morph
 
-# macOS
+# 2. Create environment
+conda create -n face-morph python=3.10
+conda activate face-morph
+
+# 3. Install package
+pip install -e .
+
+# 4. Install Blender (required)
 brew install --cask blender
+# or download from https://www.blender.org/download/
 
-# Windows
-# Download from https://www.blender.org/download/
-```
-
-**FFmpeg** (optional, for video generation):
-
-```bash
-# Ubuntu/Debian
-sudo apt install ffmpeg
-
-# macOS
+# 5. Install FFmpeg (optional, for video generation)
 brew install ffmpeg
 
-# Windows
-# Download from https://ffmpeg.org/download.html
+# 6. Verify
+face-morph --help
 ```
+
+**OpenGL Deprecation Note**: macOS deprecated OpenGL in favor of Metal. PyRender (used for CPU rendering) may show deprecation warnings but still works. For maximum stability, ensure you're on the latest macOS version.
+
+**Usage**:
+```bash
+# Always use --cpu flag on macOS
+face-morph morph face1.fbx face2.fbx --cpu
+```
+
+</details>
+
+<details>
+<summary><b>🪟 Windows (10/11)</b></summary>
+
+#### CPU-Only Installation (Recommended for beginners)
+
+```powershell
+# 1. Clone repository
+git clone https://github.com/costantinoai/face-morph.git
+cd face-morph
+
+# 2. Create environment
+conda create -n face-morph python=3.10
+conda activate face-morph
+
+# 3. Install package
+pip install -e .
+
+# 4. Install Blender (required)
+# Download from https://www.blender.org/download/
+# or use Chocolatey: choco install blender
+# or Microsoft Store: Search for "Blender"
+
+# 5. Install FFmpeg (optional, for video generation)
+# Option 1: Chocolatey: choco install ffmpeg
+# Option 2: Scoop: scoop install ffmpeg
+# Option 3: Manual download from https://ffmpeg.org/download.html
+
+# 6. Verify
+face-morph --help
+```
+
+#### GPU Installation (ADVANCED - Not Recommended for Beginners)
+
+⚠️ **WARNING**: PyTorch3D installation on Windows is complex and requires:
+- Visual Studio 2019/2022 with C++ Build Tools (several GB)
+- CUDA Toolkit matching your PyTorch version
+- Experience with C++ compilation
+
+**For beginners**: Use CPU-only mode above.
+
+**For advanced users**:
+
+```powershell
+# 1. Install Visual Studio Build Tools
+# Download from: https://visualstudio.microsoft.com/downloads/
+# Select "Desktop development with C++"
+
+# 2. Create environment
+conda create -n face-morph python=3.10
+conda activate face-morph
+
+# 3. Install PyTorch with CUDA
+conda install pytorch==2.4.1 torchvision pytorch-cuda=12.4 -c pytorch -c nvidia
+
+# 4. Install package with CUDA extras
+pip install -e .[cuda]
+
+# 5. Install PyTorch3D (requires compilation - may take 10-20 minutes)
+pip install "git+https://github.com/facebookresearch/pytorch3d.git"
+
+# 6. Verify
+python -c "import torch; print('CUDA available:', torch.cuda.is_available())"
+python -c "import pytorch3d; print('PyTorch3D OK')"
+```
+
+**Alternative**: Check PyTorch3D issues for pre-built Windows wheels: https://github.com/facebookresearch/pytorch3d/issues
+
+**Activation Scripts**:
+- Batch: `scripts\activate_env.bat`
+- PowerShell: `.\scripts\activate_env.ps1`
+
+</details>
+
+---
 
 ## Usage
 
 ### Command Line
 
-**Basic morphing:**
+**Basic morphing (full mode by default):**
 ```bash
 face-morph morph face1.fbx face2.fbx
 ```
@@ -128,14 +266,14 @@ face-morph morph face1.fbx face2.fbx
 face-morph morph face1.fbx face2.fbx --gpu
 ```
 
-**Full output (meshes + video + CSV):**
+**Minimal output (PNG + heatmaps only, faster):**
 ```bash
-face-morph morph face1.fbx face2.fbx --full --gpu
+face-morph morph face1.fbx face2.fbx --minimal
 ```
 
 **Batch process folder:**
 ```bash
-face-morph batch data/faces/ --full --gpu
+face-morph batch data/faces/ --gpu
 ```
 
 **Custom output directory:**
@@ -153,7 +291,7 @@ from face_morph.pipeline import MorphConfig, run_morphing_pipeline
 config = MorphConfig(
     input_mesh_1=Path("face1.fbx"),
     input_mesh_2=Path("face2.fbx"),
-    output_mode="full",               # "default" or "full"
+    output_mode="full",               # "full" (default) or "minimal"
     device=torch.device('cuda'),      # or 'cpu'
     use_mixed_precision=True,         # FP16 for GPU speedup
     parallel_fbx=True,
@@ -279,17 +417,109 @@ Example: 4 faces → 6 pairs (1+2, 1+3, 1+4, 2+3, 2+4, 3+4)
 
 ## Troubleshooting
 
-**"CUDA not available"**
+### Platform-Specific Issues
 
-Check GPU and drivers:
+<details>
+<summary><b>macOS: "CUDA not available" or GPU flag fails</b></summary>
+
+**Problem**: Trying to use `--gpu` flag on macOS.
+
+**Solution**: macOS does NOT support CUDA. Apple dropped NVIDIA GPU support in macOS 10.14+ (2018).
+
+```bash
+# Always use --cpu on macOS
+face-morph morph face1.fbx face2.fbx --cpu
+```
+
+The tool will automatically detect macOS and block GPU mode with a helpful error message.
+
+</details>
+
+<details>
+<summary><b>macOS: OpenGL deprecation warnings</b></summary>
+
+**Problem**: Warnings about deprecated OpenGL when using PyRender.
+
+**Explanation**: Apple deprecated OpenGL in favor of Metal, but it still works.
+
+**Solution**:
+- Warnings are harmless - the tool still works correctly
+- Update to latest macOS version for best compatibility
+- For production use, consider running on Linux if warnings are concerning
+
+</details>
+
+<details>
+<summary><b>Windows: PyTorch3D installation fails</b></summary>
+
+**Problem**: PyTorch3D compilation errors on Windows.
+
+**Solutions**:
+
+1. **Use CPU-only mode** (recommended for most users):
+   ```powershell
+   pip install -e .
+   face-morph morph face1.fbx face2.fbx --cpu
+   ```
+
+2. **For GPU**: Install Visual Studio Build Tools first:
+   - Download from: https://visualstudio.microsoft.com/downloads/
+   - Select "Desktop development with C++" workload
+   - Requires 5-10 GB disk space
+   - Compilation may take 10-20 minutes
+
+3. **Check for pre-built wheels**: https://github.com/facebookresearch/pytorch3d/issues
+
+</details>
+
+<details>
+<summary><b>Windows: Blender not found</b></summary>
+
+**Problem**: `Blender not found` error even though Blender is installed.
+
+**Solutions**:
+
+1. **Specify path manually**:
+   ```powershell
+   face-morph morph face1.fbx face2.fbx --blender "C:\Program Files\Blender Foundation\Blender 4.0\blender.exe"
+   ```
+
+2. **Add Blender to PATH**:
+   - Right-click "This PC" → Properties → Advanced System Settings
+   - Environment Variables → System Variables → Path → Edit
+   - Add: `C:\Program Files\Blender Foundation\Blender 4.0`
+   - Restart terminal
+
+3. **Install via Microsoft Store** (auto-adds to PATH):
+   - Search for "Blender" in Microsoft Store
+   - Install and restart terminal
+
+</details>
+
+<details>
+<summary><b>Linux: "CUDA not available" (GPU exists)</b></summary>
+
+**Problem**: NVIDIA GPU exists but CUDA not detected.
+
+**Check GPU and drivers**:
 ```bash
 nvidia-smi
 ```
 
-Reinstall PyTorch with CUDA:
+**Reinstall PyTorch with CUDA**:
 ```bash
-conda install pytorch pytorch-cuda=12.4 -c pytorch -c nvidia
+conda install pytorch==2.4.1 pytorch-cuda=12.4 -c pytorch -c nvidia
+python -c "import torch; print('CUDA:', torch.cuda.is_available())"
 ```
+
+**Check CUDA version compatibility**:
+```bash
+nvcc --version  # Should match PyTorch CUDA version (12.4)
+```
+
+</details>
+
+### Common Issues (All Platforms)
 
 **"Topology mismatch"**
 
@@ -305,10 +535,22 @@ face-morph morph face1.fbx face2.fbx --gpu --no-amp
 
 **"Blender not found"**
 
-Install Blender or specify path:
+The tool auto-detects Blender on all platforms. If detection fails:
+
 ```bash
+# Specify custom path
 face-morph morph face1.fbx face2.fbx --blender /path/to/blender
 ```
+
+See platform-specific sections above for detailed Blender troubleshooting.
+
+**"ffmpeg not found" (video generation skipped)**
+
+Video generation is optional. If you want videos:
+
+- **Linux**: `sudo apt install ffmpeg`
+- **macOS**: `brew install ffmpeg`
+- **Windows**: `choco install ffmpeg` or download from https://ffmpeg.org/
 
 **"No textures found"**
 
