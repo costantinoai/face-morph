@@ -71,6 +71,7 @@ class MorphConfig:
         video_fps: Frames per second for video output
         parallel_fbx: Enable parallel FBX conversion
         num_workers: Number of parallel workers for I/O tasks
+        chunk_size: Batch size for GPU rendering (meshes per batch, default: 10)
         timestamp: Optional shared timestamp for batch mode
 
     Example:
@@ -117,6 +118,7 @@ class MorphConfig:
     # Performance
     parallel_fbx: bool = True
     num_workers: int = field(default_factory=lambda: max(1, cpu_count() - 1))
+    chunk_size: int = 10  # Batch size for GPU rendering (number of meshes per batch)
 
     # Batch mode support
     timestamp: Optional[str] = None

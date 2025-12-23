@@ -95,7 +95,8 @@ def get_renderer_type(renderer) -> str:
     """
     class_name = type(renderer).__name__.lower()
 
-    if 'pytorch3d' in class_name or 'meshrasterizer' in class_name:
+    # Check class name patterns
+    if 'pytorch3d' in class_name or 'meshrenderer3d' in class_name or 'meshrasterizer' in class_name:
         return 'pytorch3d'
     elif 'pyrender' in class_name or 'offscreen' in class_name:
         return 'pyrender'
@@ -107,4 +108,7 @@ def get_renderer_type(renderer) -> str:
             return 'pyrender'
         else:
             logger.warning(f"Unknown renderer type: {type(renderer).__name__}")
+            # Use renderer_type attribute if available (from BaseRenderer)
+            if hasattr(renderer, 'renderer_type'):
+                return renderer.renderer_type
             return 'unknown'

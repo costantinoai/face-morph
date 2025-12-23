@@ -1,9 +1,0 @@
-{
-  "test_name": "default_cpu_notextured",
-  "success": true,
-  "execution_time_sec": 7.600390634994255,
-  "memory_delta_mb": 0.0,
-  "exit_code": 0,
-  "frames_generated": null,
-  "device_transfers": null
-}

@@ -108,7 +108,7 @@ class MeshRenderer3D(BaseRenderer):
         texture: Optional[torch.Tensor] = None,
         verts_uvs: Optional[torch.Tensor] = None,
         faces_uvs: Optional[torch.Tensor] = None,
-        vertex_colors: Optional[torch.Tensor] = None,
+        vertex_colors: Optional[torch.Tensor] = None,  # PyTorch3D-specific: for heatmaps
     ) -> np.ndarray:
         """Render mesh to 2D image.
 
@@ -118,7 +118,7 @@ class MeshRenderer3D(BaseRenderer):
             verts_uvs: Optional UV coordinates for texture mapping
             faces_uvs: Optional face UV indices for texture mapping
             vertex_colors: Optional per-vertex colors (V, 3) in range [0, 1]
-                          Used for heatmaps or when no texture available
+                          PyTorch3D-specific parameter for heatmaps/untextured rendering
 
         Returns:
             RGB image as numpy array (H, W, 3) in range [0, 255], uint8
