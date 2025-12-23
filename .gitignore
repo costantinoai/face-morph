@@ -42,6 +42,7 @@ test_*/
 data/
 *.log
 TODO.md
+scripts/  # Profiling and dev scripts (not for public repo)
 
 # Jupyter
 .ipynb_checkpoints/

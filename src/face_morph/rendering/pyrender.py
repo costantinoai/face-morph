@@ -313,104 +313,36 @@ class PyRenderMeshRenderer(BaseRenderer):
         Returns:
             RGB image as numpy array (H, W, 3) in range [0, 255], uint8
         """
-        import matplotlib
-        matplotlib.use('Agg')  # Non-interactive backend
-        import matplotlib.pyplot as plt
-        from matplotlib.cm import get_cmap
-        from matplotlib.colors import Normalize, TwoSlopeNorm
+        from face_morph.utils.heatmap_renderer import HeatmapRenderer
 
+        logger.debug(f"{title}: Raw values: min={vertex_values.min():.6f}, max={vertex_values.max():.6f}, mean={vertex_values.mean():.6f}")
 
-        logger.debug("{title}: Raw values: min={vertex_values.min():.6f}, max={vertex_values.max():.6f}, mean={vertex_values.mean():.6f}")
-
-        if normalize_values:
-            # Normalize vertex values to [0, 1] using 95th percentile
-            percentile = 95
-            vmin = vertex_values.min()
-            vmax = np.percentile(vertex_values, percentile)
-
-            logger.debug("{title}: Normalizing with p{percentile}={vmax:.6f}")
-
-            if vmax > vmin:
-                # Clip values above percentile
-                clipped = np.clip(vertex_values, vmin, vmax)
-                normalized = (clipped - vmin) / (vmax - vmin)
-                logger.debug("{title}: After norm: min={normalized.min():.6f}, max={normalized.max():.6f}, mean={normalized.mean():.6f}")
-            else:
-                normalized = np.zeros_like(vertex_values)
-        elif symmetric_diverging:
-            # Use symmetric range around 0 for diverging colormap
-            vmax_abs = max(abs(vertex_values.min()), abs(vertex_values.max()))
-            vmin = -vmax_abs
-            vmax = vmax_abs
-            logger.debug("{title}: Symmetric diverging: range=[{vmin:.6f}, {vmax:.6f}]")
-
-            # Normalize to [-1, 1] then shift to [0, 1]
-            if vmax_abs > 0:
-                normalized = (vertex_values / vmax_abs + 1.0) / 2.0  # Map [-vmax_abs, vmax_abs] to [0, 1]
-            else:
-                normalized = np.full_like(vertex_values, 0.5)  # All zeros -> center of colormap
-        else:
-            # No normalization - use raw values
-            vmin = vertex_values.min()
-            vmax = vertex_values.max()
-            logger.debug("{title}: No normalization, using raw range=[{vmin:.6f}, {vmax:.6f}]")
-
-            if vmax > vmin:
-                normalized = (vertex_values - vmin) / (vmax - vmin)
-            else:
-                normalized = np.full_like(vertex_values, 0.5)
-
-        # Map to colors using matplotlib colormap
-        cmap_func = get_cmap(colormap)
-        colors = cmap_func(normalized)[:, :3]  # RGB only (drop alpha)
+        # Use HeatmapRenderer utility for normalization and colormap application
+        mode = 'percentile' if normalize_values else 'minmax'
+        colors, vmin, vmax = HeatmapRenderer.render_heatmap_complete(
+            values=vertex_values,
+            colormap_name=colormap,
+            normalize_mode=mode,
+            percentile=95.0,
+            symmetric_diverging=symmetric_diverging,
+            as_torch=False,
+            device=None
+        )
 
         # Render with vertex colors
         rendered_img = self.render_mesh(vertices, faces, vertex_colors=colors)
 
         # Add colorbar if requested
         if add_colorbar:
-            fig, ax = plt.subplots(figsize=(10, 8), dpi=100)
-            ax.imshow(rendered_img)
-            ax.axis('off')
-            ax.set_title(title, fontsize=14, fontweight='bold', pad=10)
-
-            # Add colorbar with normalized or actual values
-            if symmetric_diverging:
-                # Use TwoSlopeNorm for diverging colormap centered at 0
-                if normalize_colorbar:
-                    norm = TwoSlopeNorm(vmin=-1.0, vcenter=0.0, vmax=1.0)
-                else:
-                    norm = TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax)
-            else:
-                if normalize_colorbar:
-                    norm = Normalize(vmin=0.0, vmax=1.0)
-                else:
-                    norm = Normalize(vmin=vmin, vmax=vmax)
-
-            sm = plt.cm.ScalarMappable(cmap=colormap, norm=norm)
-            sm.set_array([])
-            cbar = plt.colorbar(sm, ax=ax, fraction=0.046, pad=0.04)
-
-            # Determine label based on title (Shape vs Texture)
-            if 'Shape' in title or 'Displacement' in title:
-                if symmetric_diverging:
-                    label = 'Displacement (B - A)'
-                else:
-                    label = 'Displacement (normalized)' if normalize_colorbar else 'Displacement'
-            else:
-                if symmetric_diverging:
-                    label = 'Difference (B - A)'
-                else:
-                    label = 'Difference (normalized)' if normalize_colorbar else 'Difference'
-            cbar.set_label(label, rotation=270, labelpad=20, fontsize=12)
-
-            # Convert figure to numpy array
-            fig.canvas.draw()
-            w, h = fig.canvas.get_width_height()
-            buf = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
-            img_array = buf.reshape(h, w, 4)[:, :, :3]  # Drop alpha channel
-            plt.close(fig)
-            return img_array
+            rendered_img = HeatmapRenderer.add_colorbar_to_image(
+                image=rendered_img,
+                colormap_name=colormap,
+                vmin=vmin,
+                vmax=vmax,
+                title=title,
+                normalize_colorbar=normalize_colorbar,
+                symmetric_diverging=symmetric_diverging
+            )
 
         return rendered_img
 

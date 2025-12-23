@@ -234,6 +234,51 @@ class MorphConfig:
         """
         return self.output_mode == "full"
 
+    def get_optimal_chunk_size(
+        self,
+        num_vertices: int,
+        num_faces: int,
+        has_texture: bool = False
+    ) -> int:
+        """
+        Calculate optimal chunk size dynamically based on available GPU memory.
+
+        This method uses GPU memory profiling to determine the maximum number
+        of meshes that can be rendered in a single batch without OOM errors.
+        Falls back to static chunk_size if CUDA is unavailable.
+
+        Args:
+            num_vertices: Number of vertices in mesh
+            num_faces: Number of faces in mesh
+            has_texture: Whether mesh has textures
+
+        Returns:
+            Optimal chunk size (1-50)
+
+        Example:
+            >>> config = MorphConfig(...)
+            >>> optimal = config.get_optimal_chunk_size(10523, 20000, True)
+            >>> print(f"Optimal batch size: {optimal}")
+        """
+        from face_morph.utils.gpu_optimizer import estimate_render_batch_size
+
+        if self.device.type != 'cuda':
+            # CPU mode: use static chunk size
+            return self.chunk_size
+
+        # Dynamic batch sizing based on GPU memory
+        optimal_size = estimate_render_batch_size(
+            num_vertices=num_vertices,
+            num_faces=num_faces,
+            has_texture=has_texture,
+            image_size=512,  # Standard output resolution
+            min_batch_size=1,
+            max_batch_size=min(50, len(self.morph_ratios)),
+            safety_margin=0.6  # Conservative for rendering
+        )
+
+        return optimal_size
+
     def __repr__(self) -> str:
         """
         Create readable string representation of config.

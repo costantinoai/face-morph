@@ -400,7 +400,7 @@ class MeshRenderer3D(BaseRenderer):
         Args:
             mesh: PyTorch3D Meshes object
             vertex_values: Per-vertex scalar values (V,) to visualize as heatmap
-            colormap: Matplotlib colormap name ('viridis', 'jet', 'hot', etc.)
+            colormap: Matplotlib colormap name ('viridis', 'jet', 'hot', etc.')
             add_colorbar: If True, add colorbar overlay to the rendered image
             title: Title for the visualization (used if add_colorbar=True)
             normalize_colorbar: If True, show colorbar as 0-1 instead of actual values
@@ -410,46 +410,19 @@ class MeshRenderer3D(BaseRenderer):
         Returns:
             RGB image as numpy array (H, W, 3) in range [0, 255], uint8
         """
-        import matplotlib.pyplot as plt
-        from matplotlib.cm import get_cmap
+        from face_morph.utils.heatmap_renderer import HeatmapRenderer
 
-        if normalize_values:
-            # Normalize vertex values to [0, 1] using 95th percentile
-            percentile = 0.95
-            vmin = vertex_values.min().item()
-            vmax = torch.quantile(vertex_values, percentile).item()
-
-            if vmax > vmin:
-                # Clip values above percentile
-                clipped = torch.clamp(vertex_values, vmin, vmax)
-                normalized = (clipped - vmin) / (vmax - vmin)
-            else:
-                normalized = torch.zeros_like(vertex_values)
-        elif symmetric_diverging:
-            # Use symmetric range around 0 for diverging colormap
-            vmax_abs = max(abs(vertex_values.min().item()), abs(vertex_values.max().item()))
-            vmin = -vmax_abs
-            vmax = vmax_abs
-
-            # Normalize to [-1, 1] then shift to [0, 1]
-            if vmax_abs > 0:
-                normalized = (vertex_values / vmax_abs + 1.0) / 2.0  # Map [-vmax_abs, vmax_abs] to [0, 1]
-            else:
-                normalized = torch.full_like(vertex_values, 0.5)  # All zeros -> center of colormap
-        else:
-            # No normalization - use raw values
-            vmin = vertex_values.min().item()
-            vmax = vertex_values.max().item()
-
-            if vmax > vmin:
-                normalized = (vertex_values - vmin) / (vmax - vmin)
-            else:
-                normalized = torch.full_like(vertex_values, 0.5)
-
-        # Map to colors using matplotlib colormap
-        cmap = get_cmap(colormap)
-        colors = cmap(normalized.cpu().numpy())[:, :3]  # RGB only (drop alpha)
-        vertex_colors = torch.from_numpy(colors).float().to(self.device)
+        # Use HeatmapRenderer utility for normalization and colormap application
+        mode = 'percentile' if normalize_values else 'minmax'
+        vertex_colors, vmin, vmax = HeatmapRenderer.render_heatmap_complete(
+            values=vertex_values,
+            colormap_name=colormap,
+            normalize_mode=mode,
+            percentile=95.0,
+            symmetric_diverging=symmetric_diverging,
+            as_torch=True,
+            device=self.device
+        )
 
         # Render with vertex colors using unlit mode to preserve exact colors
         # Save current lights
@@ -478,59 +451,15 @@ class MeshRenderer3D(BaseRenderer):
 
         # Add colorbar if requested
         if add_colorbar:
-            import matplotlib
-            matplotlib.use('Agg')  # Use non-interactive backend
-            import matplotlib.pyplot as plt
-            from matplotlib import cm
-            from matplotlib.colors import Normalize, TwoSlopeNorm
-
-            # Create figure with rendered image
-            fig, ax = plt.subplots(figsize=(10, 8), dpi=100)
-            ax.imshow(rendered_img)
-            ax.axis('off')
-            ax.set_title(title, fontsize=14, fontweight='bold', pad=10)
-
-            # Add colorbar with normalized or actual values
-            if symmetric_diverging:
-                # Use TwoSlopeNorm for diverging colormap centered at 0
-                if normalize_colorbar:
-                    norm = TwoSlopeNorm(vmin=-1.0, vcenter=0.0, vmax=1.0)
-                else:
-                    norm = TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax)
-            else:
-                if normalize_colorbar:
-                    norm = Normalize(vmin=0.0, vmax=1.0)
-                else:
-                    norm = Normalize(vmin=vmin, vmax=vmax)
-
-            sm = cm.ScalarMappable(cmap=cmap, norm=norm)
-            sm.set_array([])
-            cbar = plt.colorbar(sm, ax=ax, fraction=0.046, pad=0.04)
-
-            # Determine label based on title (Shape vs Texture)
-            if 'Shape' in title or 'Displacement' in title:
-                if symmetric_diverging:
-                    label = 'Displacement (B - A)'
-                else:
-                    label = 'Displacement (normalized)' if normalize_colorbar else 'Displacement'
-            else:
-                if symmetric_diverging:
-                    label = 'Difference (B - A)'
-                else:
-                    label = 'Difference (normalized)' if normalize_colorbar else 'Difference'
-            cbar.set_label(label, rotation=270, labelpad=20, fontsize=12)
-
-            # Convert figure to numpy array
-            fig.canvas.draw()
-            # Get canvas size: get_width_height() returns (width, height)
-            w, h = fig.canvas.get_width_height()
-            # buffer_rgba() returns RGBA data
-            buf = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
-            # Reshape to (height, width, 4) and drop alpha
-            img_array = buf.reshape(h, w, 4)[:, :, :3]
-            plt.close(fig)
-
-            return img_array
+            rendered_img = HeatmapRenderer.add_colorbar_to_image(
+                image=rendered_img,
+                colormap_name=colormap,
+                vmin=vmin,
+                vmax=vmax,
+                title=title,
+                normalize_colorbar=normalize_colorbar,
+                symmetric_diverging=symmetric_diverging
+            )
 
         return rendered_img
 
