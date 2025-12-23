@@ -240,10 +240,21 @@ class PyRenderMeshRenderer(BaseRenderer):
         # If we use smooth=False, pyrender duplicates vertices per-face, breaking the UV mapping
         mesh_pr = pyrender.Mesh.from_trimesh(mesh, smooth=True)
 
+        # Adjust lighting based on texture presence
+        # Textured meshes need very bright light to show details
+        # Vertex-colored meshes (heatmaps) need low light to preserve colormap colors
+        has_texture = texture is not None and uv_coords is not None
+        if has_texture:
+            ambient = [1.5, 1.5, 1.5]  # Very high ambient for textured meshes
+            light_intensity = 9.0       # Very strong directional light for textures
+        else:
+            ambient = [0.4, 0.4, 0.4]  # Low ambient to preserve vertex colors (heatmaps)
+            light_intensity = 1.4       # Minimal directional light
+
         # Create scene
         scene = pyrender.Scene(
             bg_color=list(self.background_color) + [255.0],
-            ambient_light=[0.6, 0.6, 0.6],
+            ambient_light=ambient,
         )
         scene.add(mesh_pr)
 
@@ -252,13 +263,13 @@ class PyRenderMeshRenderer(BaseRenderer):
         camera_pose = np.array([
             [1.0, 0.0, 0.0, 0.0],
             [0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 2.5],
+            [0.0, 0.0, 1.0, 2.8],  # Increased from 2.5 to show more forehead
             [0.0, 0.0, 0.0, 1.0],
         ])
         scene.add(camera, pose=camera_pose)
 
         # Add light (frontal lighting)
-        light = pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], intensity=3.0)
+        light = pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], intensity=light_intensity)
         scene.add(light, pose=camera_pose)
 
         # Render
