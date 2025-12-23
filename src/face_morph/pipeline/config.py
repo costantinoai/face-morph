@@ -267,13 +267,14 @@ class MorphConfig:
             return self.chunk_size
 
         # Dynamic batch sizing based on GPU memory
+        # Note: PyTorch3D scales linearly with batch size, so keep it small
         optimal_size = estimate_render_batch_size(
             num_vertices=num_vertices,
             num_faces=num_faces,
             has_texture=has_texture,
             image_size=512,  # Standard output resolution
             min_batch_size=1,
-            max_batch_size=min(50, len(self.morph_ratios)),
+            max_batch_size=10,  # Conservative: PyTorch3D doesn't benefit from larger batches
             safety_margin=0.6  # Conservative for rendering
         )
 

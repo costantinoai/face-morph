@@ -82,11 +82,13 @@ class MeshRenderer3D(BaseRenderer):
         )
 
         # Rasterization settings
+        # Use bin_size=None for automatic optimization (much faster than bin_size=0)
+        # See: https://github.com/facebookresearch/pytorch3d/issues/259
         raster_settings = RasterizationSettings(
             image_size=image_size,
             blur_radius=0.0,
             faces_per_pixel=1,
-            bin_size=0,
+            bin_size=None,  # Automatic binning (10-100x faster than bin_size=0)
         )
 
         # Create renderer
@@ -276,8 +278,10 @@ class MeshRenderer3D(BaseRenderer):
             chunk_results = self._render_mesh_chunk(chunk_meshes, chunk_textures, verts_uvs, faces_uvs)
             all_results.extend(chunk_results)
 
-            # Free GPU memory after each chunk
-            torch.cuda.empty_cache()
+            # Synchronize and free GPU memory after each chunk
+            if self.device.type == 'cuda':
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
 
         logger.debug(f"Batch rendering complete: {len(all_results)} images")
         return all_results

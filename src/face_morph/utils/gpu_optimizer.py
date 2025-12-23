@@ -188,13 +188,18 @@ def estimate_render_batch_size(
     has_texture: bool = False,
     image_size: int = 512,
     min_batch_size: int = 1,
-    max_batch_size: int = 50,
+    max_batch_size: int = 10,  # Conservative: PyTorch3D batch rendering scales linearly
     safety_margin: float = 0.6  # Conservative for rendering (60%)
 ) -> int:
     """
     Estimate optimal batch size for mesh rendering based on mesh complexity.
 
-    Rendering is more memory-intensive than morphing due to:
+    IMPORTANT: PyTorch3D batch rendering scales LINEARLY with batch size
+    (see https://github.com/facebookresearch/pytorch3d/issues/1120).
+    Therefore, smaller batch sizes (4-10) are often optimal to balance
+    memory usage vs minimal actual speedup from batching.
+
+    Rendering is memory-intensive due to:
     - Rasterization buffers
     - Texture atlases
     - Fragment shader intermediate results
@@ -205,11 +210,11 @@ def estimate_render_batch_size(
         has_texture: Whether mesh has textures
         image_size: Output image resolution (e.g., 512)
         min_batch_size: Minimum batch size
-        max_batch_size: Maximum batch size
+        max_batch_size: Maximum batch size (default 10, PyTorch3D limitation)
         safety_margin: Fraction of memory to use (conservative for rendering)
 
     Returns:
-        Optimal rendering batch size
+        Optimal rendering batch size (typically 4-10 for PyTorch3D)
     """
     if not torch.cuda.is_available():
         return 10  # Default for CPU
