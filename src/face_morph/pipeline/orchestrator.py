@@ -98,7 +98,7 @@ def run_morphing_pipeline(config: MorphConfig) -> Path:
         >>> config = MorphConfig(
         ...     input_mesh_1=Path("face1.fbx"),
         ...     input_mesh_2=Path("face2.fbx"),
-        ...     output_mode="default",
+        ...     output_mode="full",  # Default: full output
         ...     device=torch.device('cuda')
         ... )
         >>> output_dir = run_morphing_pipeline(config)

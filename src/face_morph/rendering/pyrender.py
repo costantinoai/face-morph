@@ -20,6 +20,7 @@ from pytorch3d.structures import Meshes
 
 from face_morph.utils.logging import get_logger
 from face_morph.rendering.base import BaseRenderer
+from face_morph.utils.platform_utils import check_opengl_support
 
 # Get logger for this module
 logger = get_logger(__name__)
@@ -107,6 +108,11 @@ class PyRenderMeshRenderer(BaseRenderer):
         """
         # PyRender is always CPU-based (uses OpenGL/OSMesa)
         super().__init__(torch.device('cpu'))
+
+        # Check for OpenGL support and warn on macOS
+        supported, warning = check_opengl_support()
+        if warning:
+            logger.warning(warning)
 
         self.image_size = image_size
         self.background_color = np.array(background_color) * 255  # pyrender uses 0-255

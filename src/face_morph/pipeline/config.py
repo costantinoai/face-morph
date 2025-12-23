@@ -60,7 +60,7 @@ class MorphConfig:
         input_mesh_1: Path to first input mesh (FBX or OBJ)
         input_mesh_2: Path to second input mesh (FBX or OBJ)
         output_dir: Base output directory (default: 'results')
-        output_mode: Output mode - 'default' (PNG + heatmaps) or 'full' (+ meshes + video)
+        output_mode: Output mode - 'minimal' (PNG + heatmaps only) or 'full' (+ meshes + video + CSV)
         morph_ratios: List of (ratio1, ratio2) tuples for interpolation
         device: PyTorch device (cpu or cuda)
         use_mixed_precision: Enable FP16 mixed precision (GPU only)
@@ -78,10 +78,11 @@ class MorphConfig:
         >>> config = MorphConfig(
         ...     input_mesh_1=Path("face1.fbx"),
         ...     input_mesh_2=Path("face2.fbx"),
-        ...     output_mode="full",
         ...     device=torch.device('cuda')
         ... )
-        >>> config.should_export_meshes
+        >>> config.output_mode  # Full mode by default
+        'full'
+        >>> config.should_export_meshes  # Exports meshes + video + CSV
         True
         >>> config.should_create_video
         True
@@ -92,8 +93,8 @@ class MorphConfig:
     input_mesh_2: Path
     output_dir: Path = Path("results")
 
-    # Output control (NEW - Week 2 feature)
-    output_mode: str = "default"  # "default" or "full"
+    # Output control
+    output_mode: str = "full"  # "minimal" or "full"
 
     # Morphing parameters
     morph_ratios: List[Tuple[float, float]] = field(
@@ -158,9 +159,9 @@ class MorphConfig:
             )
 
         # Validate output mode
-        if self.output_mode not in ('default', 'full'):
+        if self.output_mode not in ('minimal', 'full'):
             raise ValidationError(
-                f"output_mode must be 'default' or 'full', got '{self.output_mode}'"
+                f"output_mode must be 'minimal' or 'full', got '{self.output_mode}'"
             )
 
         # Disable AMP on CPU (not supported)
@@ -196,8 +197,8 @@ class MorphConfig:
         """
         Whether to export OBJ/FBX meshes.
 
-        In default mode, meshes are not exported to save time.
-        In full mode, all 41 meshes are exported as OBJ and FBX.
+        In minimal mode, meshes are not exported (faster, smaller output).
+        In full mode (default), all 41 meshes are exported as OBJ and FBX.
 
         Returns:
             True if output_mode is 'full'
@@ -209,8 +210,8 @@ class MorphConfig:
         """
         Whether to create MP4 video animation.
 
-        In default mode, video is not created to save time.
-        In full mode, video is created from PNG frames.
+        In minimal mode, video is not created (faster, smaller output).
+        In full mode (default), video is created from PNG frames.
 
         Returns:
             True if output_mode is 'full'
@@ -222,8 +223,8 @@ class MorphConfig:
         """
         Whether to export CSV statistics and vertex data.
 
-        In default mode, CSV files are not exported.
-        In full mode, generates:
+        In minimal mode, CSV files are not exported.
+        In full mode (default), generates:
         - statistics.csv: Summary metrics for all displacement components
         - vertex_displacements.csv: Per-vertex displacement data
         - texture_differences.csv: Per-pixel texture metrics (if textures available)

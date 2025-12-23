@@ -13,6 +13,11 @@ from itertools import combinations
 
 from face_morph.pipeline import MorphConfig, run_morphing_pipeline
 from face_morph.utils.logging import get_logger
+from face_morph.utils.platform_utils import (
+    get_blender_executable,
+    get_blender_install_instructions,
+    validate_cuda_platform,
+)
 
 logger = get_logger(__name__)
 
@@ -27,9 +32,9 @@ logger = get_logger(__name__)
     help='Output directory (default: results/)'
 )
 @click.option(
-    '--full',
+    '--minimal',
     is_flag=True,
-    help='Generate full output: PNG + heatmaps + meshes + video + CSV (~2 hours)'
+    help='Minimal mode: PNG + heatmaps only (faster). Default is full mode (meshes + video + CSV).'
 )
 @click.option(
     '--gpu/--cpu',
@@ -61,23 +66,23 @@ logger = get_logger(__name__)
 @click.option(
     '--blender',
     type=str,
-    default='blender',
-    help='Path to Blender executable (default: blender)'
+    default=None,
+    help='Path to Blender executable (default: auto-detect)'
 )
-def morph(input1, input2, output, full, gpu, no_amp, verbose, quiet, log_level, blender):
+def morph(input1, input2, output, minimal, gpu, no_amp, verbose, quiet, log_level, blender):
     """
     Morph two 3D face meshes with interpolation.
 
-    By default, generates PNG images and heatmaps only (fast mode, ~5-10 min).
-    Use --full to also export meshes, create video, and export CSV data (complete mode, ~2 hours).
+    By default, generates full output: PNG + heatmaps + meshes + video + CSV.
+    Use --minimal for faster processing with PNG + heatmaps only.
 
     \b
     Examples:
-        # Fast mode (PNG + heatmaps only)
-        face-morph face1.fbx face2.fbx
+        # Full mode (default: PNG + heatmaps + meshes + video + CSV)
+        face-morph face1.fbx face2.fbx --gpu
 
-        # Full mode (PNG + heatmaps + meshes + video + CSV)
-        face-morph face1.fbx face2.fbx --full --gpu
+        # Minimal mode (PNG + heatmaps only, faster)
+        face-morph face1.fbx face2.fbx --minimal
 
         # Custom output directory
         face-morph face1.obj face2.obj -o custom_results/
@@ -89,13 +94,49 @@ def morph(input1, input2, output, full, gpu, no_amp, verbose, quiet, log_level, 
     if quiet:
         verbose = False
 
+    # Validate CUDA on current platform
+    if gpu:
+        can_use_cuda, cuda_error = validate_cuda_platform()
+        if not can_use_cuda:
+            click.secho(f"\n✗ CUDA not supported on this platform", fg='red', bold=True)
+            click.echo()
+            click.echo(cuda_error)
+            sys.exit(1)
+
+    # Auto-detect Blender if not specified
+    if blender is None:
+        blender = get_blender_executable()
+        if verbose:
+            click.echo(f"Auto-detected Blender: {blender}")
+
+    # Verify Blender is accessible
+    import subprocess
+    try:
+        result = subprocess.run(
+            [blender, '--version'],
+            capture_output=True,
+            timeout=5
+        )
+        if result.returncode != 0:
+            click.secho(f"\n✗ Blender executable not working: {blender}", fg='red', bold=True)
+            click.echo()
+            click.echo(get_blender_install_instructions())
+            sys.exit(1)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        click.secho(f"\n✗ Blender not found: {blender}", fg='red', bold=True)
+        click.echo()
+        click.echo(get_blender_install_instructions())
+        click.echo()
+        click.echo("You can specify a custom path with: --blender /path/to/blender")
+        sys.exit(1)
+
     # Create config
     try:
         config = MorphConfig(
             input_mesh_1=input1,
             input_mesh_2=input2,
             output_dir=output or Path('results'),
-            output_mode='full' if full else 'default',
+            output_mode='minimal' if minimal else 'full',
             device=torch.device('cuda' if gpu else 'cpu'),
             use_mixed_precision=not no_amp,
             blender_path=blender,
@@ -136,9 +177,9 @@ def morph(input1, input2, output, full, gpu, no_amp, verbose, quiet, log_level, 
     help='Output directory (default: results/)'
 )
 @click.option(
-    '--full',
+    '--minimal',
     is_flag=True,
-    help='Generate full output for each pair'
+    help='Minimal mode: PNG + heatmaps only. Default is full mode (meshes + video + CSV).'
 )
 @click.option(
     '--gpu/--cpu',
@@ -157,23 +198,25 @@ def morph(input1, input2, output, full, gpu, no_amp, verbose, quiet, log_level, 
     default='INFO',
     help='Logging level (default: INFO)'
 )
-def batch(folder, output, full, gpu, verbose, log_level):
+def batch(folder, output, minimal, gpu, verbose, log_level):
     """
     Batch process all unique pairs in a folder.
 
     Discovers all .fbx and .obj files, generates all unique morphing combinations
     (excludes self-pairs, treats pairs as unordered).
 
+    By default, generates full output for each pair.
+
     \b
     Examples:
-        # Process all pairs in folder (fast mode)
-        face-morph batch data/faces/
+        # Full mode (default: PNG + heatmaps + meshes + video + CSV)
+        face-morph batch data/faces/ --gpu
 
-        # Full mode with GPU acceleration
-        face-morph batch data/faces/ --full --gpu
+        # Minimal mode (PNG + heatmaps only, faster)
+        face-morph batch data/faces/ --minimal
 
         # Custom output directory
-        face-morph batch data/ -o batch_results/
+        face-morph batch data/ -o my_results/
     """
     from datetime import datetime
 
@@ -206,7 +249,7 @@ def batch(folder, output, full, gpu, verbose, log_level):
                 input_mesh_1=mesh1,
                 input_mesh_2=mesh2,
                 output_dir=output or Path('results'),
-                output_mode='full' if full else 'default',
+                output_mode='minimal' if minimal else 'full',
                 device=torch.device('cuda' if gpu else 'cpu'),
                 verbose=verbose,
                 log_level=log_level.upper(),
@@ -252,19 +295,19 @@ def cli():
 
     \b
     Output Modes:
-      Default: PNG images + heatmaps (fast, ~5-10 min)
-      Full:    PNG + heatmaps + meshes + video + CSV (complete, ~2 hours)
+      Full (default):  PNG + heatmaps + meshes + video + CSV (comprehensive output)
+      Minimal:         PNG + heatmaps only (faster, use --minimal flag)
 
     \b
     Examples:
-        # Morph two faces (default mode)
-        face-morph morph face1.fbx face2.fbx
+        # Morph two faces (full mode, default)
+        face-morph morph face1.fbx face2.fbx --gpu
 
-        # Full output with GPU
-        face-morph morph face1.fbx face2.fbx --full --gpu
+        # Minimal output (faster)
+        face-morph morph face1.fbx face2.fbx --minimal
 
-        # Batch process folder
-        face-morph batch data/faces/ --full --gpu
+        # Batch process folder (full mode)
+        face-morph batch data/faces/ --gpu
 
     \b
     For more help on a specific command:
