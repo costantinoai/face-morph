@@ -452,22 +452,84 @@ class PipelineStages:
         """
         log("STEP 7.5: Generating variance heatmaps...")
 
-        # Compute displacement components (needed for both heatmaps and CSV export)
-        log("  Computing shape displacement between stimulus A and B...")
-        normal_disp, tangent_disp, total_disp = compute_shape_displacement_components(
-            mesh1, mesh2
-        )
+        # ✅ OPTIMIZATION: Check for cached heatmap computation results
+        import hashlib
+        cache_file = pair_dir / ".heatmap_cache.pt"
 
-        # Compute texture difference components if available
-        luminance_diff = None
-        chroma_diff = None
-        delta_e = None
+        # Generate cache key from mesh vertices (only vertices change between different meshes)
+        # Use first 1000 vertices for hash to balance accuracy vs speed
+        verts1_sample = mesh1.verts_packed()[:1000].cpu().numpy()
+        verts2_sample = mesh2.verts_packed()[:1000].cpu().numpy()
+        mesh1_hash = hashlib.md5(verts1_sample.tobytes()).hexdigest()[:16]
+        mesh2_hash = hashlib.md5(verts2_sample.tobytes()).hexdigest()[:16]
+        cache_key = f"{mesh1_hash}_{mesh2_hash}"
 
-        if has_textures and texture1 is not None and texture2 is not None:
-            log("  Computing texture difference between stimulus A and B...")
-            luminance_diff, chroma_diff, delta_e = compute_texture_difference_components(
-                [texture1, texture2]
+        # Try to load from cache
+        cache_hit = False
+        if cache_file.exists():
+            try:
+                cached_data = torch.load(cache_file)
+                if cached_data.get('cache_key') == cache_key:
+                    # Cache is valid - use cached computation results
+                    log("  ✓ Using cached heatmap computation data")
+
+                    # Move cached tensors to correct device (GPU if available)
+                    device = mesh1.device
+                    normal_disp = cached_data['normal_disp']
+                    tangent_disp = cached_data['tangent_disp']
+                    total_disp = cached_data['total_disp']
+
+                    # Move torch tensors to device if needed
+                    if torch.is_tensor(normal_disp) and normal_disp.device != device:
+                        normal_disp = normal_disp.to(device)
+                    if torch.is_tensor(tangent_disp) and tangent_disp.device != device:
+                        tangent_disp = tangent_disp.to(device)
+                    if torch.is_tensor(total_disp) and total_disp.device != device:
+                        total_disp = total_disp.to(device)
+
+                    luminance_diff = cached_data.get('luminance_diff')
+                    chroma_diff = cached_data.get('chroma_diff')
+                    delta_e = cached_data.get('delta_e')
+                    cache_hit = True
+                else:
+                    log("  Cache key mismatch - recomputing")
+            except Exception as e:
+                log(f"  Cache load failed ({e}) - recomputing")
+
+        # If no cache hit, compute displacement components
+        if not cache_hit:
+            # Compute displacement components (needed for both heatmaps and CSV export)
+            log("  Computing shape displacement between stimulus A and B...")
+            normal_disp, tangent_disp, total_disp = compute_shape_displacement_components(
+                mesh1, mesh2
             )
+
+            # Compute texture difference components if available
+            luminance_diff = None
+            chroma_diff = None
+            delta_e = None
+
+            if has_textures and texture1 is not None and texture2 is not None:
+                log("  Computing texture difference between stimulus A and B...")
+                luminance_diff, chroma_diff, delta_e = compute_texture_difference_components(
+                    [texture1, texture2]
+                )
+
+            # ✅ OPTIMIZATION: Save computation results to cache
+            try:
+                cache_data = {
+                    'cache_key': cache_key,
+                    'normal_disp': normal_disp.cpu() if torch.is_tensor(normal_disp) else normal_disp,
+                    'tangent_disp': tangent_disp.cpu() if torch.is_tensor(tangent_disp) else tangent_disp,
+                    'total_disp': total_disp.cpu() if torch.is_tensor(total_disp) else total_disp,
+                    'luminance_diff': luminance_diff,  # Already numpy
+                    'chroma_diff': chroma_diff,        # Already numpy
+                    'delta_e': delta_e,                # Already numpy
+                }
+                torch.save(cache_data, cache_file)
+                log("  ✓ Saved heatmap computation to cache")
+            except Exception as e:
+                log(f"  Warning: Failed to save cache ({e})")
 
         # Define heatmap paths
         shape_heatmap_path = pair_dir / "shape_displacement_components.png"
