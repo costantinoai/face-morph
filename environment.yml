@@ -1,0 +1,27 @@
+name: face-morph
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - fvcore
+  - iopath
+dependencies:
+  - python=3.10
+  # PyTorch with CUDA 12.4 (use cpuonly for CPU-only systems)
+  - pytorch=2.4.1
+  - torchvision
+  - pytorch-cuda=12.4  # Comment out for CPU-only and uncomment line below
+  # - cpuonly  # Uncomment for CPU-only systems
+  # CUDA development tools (needed to build PyTorch3D)
+  # CRITICAL: cuda-nvcc version MUST match pytorch-cuda version (12.4)
+  - cuda-nvcc=12.4.*  # NVIDIA CUDA compiler - version must match PyTorch CUDA
+  - cuda-toolkit  # Full CUDA toolkit
+  # PyTorch3D dependencies
+  - fvcore
+  - iopath
+  # Other dependencies
+  - pillow
+  - matplotlib
+  - pip
+  # Note: PyTorch3D will be installed separately via install.sh
+  # Run: FORCE_CUDA=1 pip install --no-build-isolation "git+https://github.com/facebookresearch/pytorch3d.git"
