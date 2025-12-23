@@ -39,6 +39,7 @@ Thumbs.db
 results/
 data/
 *.log
+TODO.md
 
 # Jupyter
 .ipynb_checkpoints/
