@@ -43,6 +43,17 @@ data/
 *.log
 TODO.md
 scripts/  # Profiling and dev scripts (not for public repo)
+profiling_results/  # Local profiling data
+PROFILING_*.md  # Local profiling documentation
+OPTIMIZATION_*.md  # Local optimization documentation
+README_PERFORMANCE_SECTION.md  # Template file
+
+# Docker - local development only
+.dockerignore
+Dockerfile.cpu
+Dockerfile.gpu
+docker-compose.yml
+DOCKER.md
 
 # Jupyter
 .ipynb_checkpoints/
