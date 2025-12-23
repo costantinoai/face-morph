@@ -1,0 +1,9 @@
+{
+  "test_name": "full_cpu_textured",
+  "success": true,
+  "execution_time_sec": 48.34874151399708,
+  "memory_delta_mb": 0.0,
+  "exit_code": 0,
+  "frames_generated": null,
+  "device_transfers": null
+}
