@@ -8,9 +8,11 @@ The factory module automatically selects the appropriate renderer based on
 available hardware and software.
 """
 
+from .base import BaseRenderer
 from .factory import create_optimal_renderer, get_renderer_type
 
 __all__ = [
+    'BaseRenderer',
     'create_optimal_renderer',
     'get_renderer_type',
 ]

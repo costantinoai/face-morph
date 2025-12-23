@@ -12,12 +12,15 @@ Reference: https://github.com/mmatl/pyrender/issues/126
 """
 
 import numpy as np
+import torch
 import pyrender
 import trimesh
 from pathlib import Path
 from typing import Optional, Tuple, List
+from pytorch3d.structures import Meshes
 
 from face_morph.utils.logging import get_logger
+from face_morph.rendering.base import BaseRenderer
 
 # Get logger for this module
 logger = get_logger(__name__)
@@ -80,7 +83,7 @@ def split_vertices_at_seams(vertices, faces, uv_coords, uv_faces):
     return new_vertices, new_faces, new_uvs
 
 
-class PyRenderMeshRenderer:
+class PyRenderMeshRenderer(BaseRenderer):
     """OpenGL-based mesh renderer using pyrender (fast CPU rendering).
 
     Uses:
@@ -91,6 +94,7 @@ class PyRenderMeshRenderer:
 
     def __init__(
         self,
+        device: torch.device = None,  # Ignored - PyRender is always CPU
         image_size: int = 512,
         background_color: Tuple[float, float, float] = (1.0, 1.0, 1.0),
         use_offscreen: bool = True,
@@ -98,14 +102,17 @@ class PyRenderMeshRenderer:
         """Initialize pyrender renderer.
 
         Args:
+            device: Torch device (ignored, PyRender always uses CPU)
             image_size: Output image resolution (square)
             background_color: RGB background color (0-1 range)
             use_offscreen: Use offscreen rendering (required for headless)
         """
+        # PyRender is always CPU-based (uses OpenGL/OSMesa)
+        super().__init__(torch.device('cpu'))
+
         self.image_size = image_size
         self.background_color = np.array(background_color) * 255  # pyrender uses 0-255
         self.use_offscreen = use_offscreen
-        self.device = 'cpu'  # PyRender always runs on CPU (uses OpenGL/OSMesa)
 
         # Create renderer (will auto-detect OSMesa/OpenGL)
         if use_offscreen:
@@ -392,10 +399,81 @@ class PyRenderMeshRenderer:
 
         return rendered_img
 
-    def __del__(self):
+    def batch_render_meshes(
+        self,
+        meshes_list: List[Meshes],
+        textures_list: Optional[List[torch.Tensor]] = None,
+        verts_uvs: Optional[torch.Tensor] = None,
+        faces_uvs: Optional[torch.Tensor] = None,
+        chunk_size: int = 10,
+    ) -> List[np.ndarray]:
+        """
+        Render multiple meshes (sequential - PyRender doesn't support batching).
+
+        Args:
+            meshes_list: List of PyTorch3D Meshes objects
+            textures_list: Optional list of texture images, one per mesh
+            verts_uvs: UV coordinates (shared across all meshes)
+            faces_uvs: Face UV indices (shared across all meshes)
+            chunk_size: Ignored (no batching in PyRender)
+
+        Returns:
+            List of RGB images as numpy arrays (H, W, 3) in range [0, 255], uint8
+
+        Note:
+            PyRender doesn't support batch rendering, so this falls back to
+            sequential rendering. For better performance, use PyTorch3D renderer.
+        """
+        logger.debug(f"Sequential rendering of {len(meshes_list)} meshes (PyRender)...")
+        rendered_images = []
+
+        for idx, mesh in enumerate(meshes_list, 1):
+            # Convert PyTorch3D mesh to numpy
+            vertices = mesh.verts_packed().cpu().numpy()
+            faces = mesh.faces_packed().cpu().numpy()
+
+            # Get texture for this mesh
+            texture = None
+            if textures_list and idx <= len(textures_list):
+                tex = textures_list[idx - 1]
+                if tex is not None:
+                    texture = tex.cpu().numpy() if torch.is_tensor(tex) else tex
+
+            # Convert UV coords to numpy if available
+            uv_coords_np = None
+            uv_faces_np = None
+            if verts_uvs is not None and faces_uvs is not None:
+                uv_coords_np = verts_uvs.cpu().numpy() if torch.is_tensor(verts_uvs) else verts_uvs
+                uv_faces_np = faces_uvs.cpu().numpy() if torch.is_tensor(faces_uvs) else faces_uvs
+
+                # Handle batched UV coordinates
+                if uv_coords_np.ndim == 3:
+                    uv_coords_np = uv_coords_np[0]  # Take first batch
+                if uv_faces_np.ndim == 3:
+                    uv_faces_np = uv_faces_np[0]  # Take first batch
+
+            # Render using existing render_mesh method
+            rendered_img = self.render_mesh(
+                vertices, faces,
+                texture=texture,
+                uv_coords=uv_coords_np,
+                uv_faces=uv_faces_np
+            )
+            rendered_images.append(rendered_img)
+
+        logger.debug(f"Sequential rendering complete: {len(rendered_images)} images")
+        return rendered_images
+
+    def cleanup(self):
         """Clean up renderer resources."""
         if self.use_offscreen and self.renderer is not None:
             self.renderer.delete()
+            self.renderer = None
+        logger.debug("PyRender renderer cleaned up")
+
+    def __del__(self):
+        """Clean up renderer resources on destruction."""
+        self.cleanup()
 
 
 def create_pyrender_renderer(

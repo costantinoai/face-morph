@@ -23,12 +23,13 @@ from pytorch3d.renderer import (
     TexturesUV,
 )
 from face_morph.utils.logging import get_logger
+from face_morph.rendering.base import BaseRenderer
 
 # Get logger for this module
 logger = get_logger(__name__)
 
 
-class MeshRenderer3D:
+class MeshRenderer3D(BaseRenderer):
     """PyTorch3D-based mesh renderer for creating 2D images from 3D meshes.
 
     Supports:
@@ -51,7 +52,7 @@ class MeshRenderer3D:
             image_size: Output image resolution (square)
             background_color: RGB background color (0-1 range)
         """
-        self.device = device
+        super().__init__(device)  # Initialize BaseRenderer
         self.image_size = image_size
         self.background_color = background_color
 
@@ -503,6 +504,15 @@ class MeshRenderer3D:
             return img_array
 
         return rendered_img
+
+    def cleanup(self):
+        """Clean up renderer resources.
+
+        Releases GPU memory and clears cached tensors.
+        """
+        if self.device.type == 'cuda':
+            torch.cuda.empty_cache()
+        logger.debug("PyTorch3D renderer cleaned up")
 
 
 def create_renderer(
