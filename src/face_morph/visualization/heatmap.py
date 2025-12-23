@@ -54,17 +54,38 @@ def compute_shape_displacement_components(
     # 3. Total displacement (magnitude): Euclidean distance
     total_displacement = torch.norm(displacement_vectors, dim=-1)  # (V,)
 
+    # Validate orthogonal decomposition: normal² + tangent² should equal total²
+    # This catches numerical errors, bugs, or corrupted mesh normals
+    reconstructed_total = torch.sqrt(normal_displacement**2 + tangent_displacement**2)
+    decomposition_error = torch.abs(total_displacement - reconstructed_total)
+    max_error = decomposition_error.max().item()
+    mean_error = decomposition_error.mean().item()
+
+    if max_error > 1e-4:
+        logger.warning(
+            f"Orthogonal decomposition validation: max error = {max_error:.2e}, mean error = {mean_error:.2e}. "
+            f"This may indicate numerical precision issues or corrupted mesh normals."
+        )
+    else:
+        logger.debug(f"Orthogonal decomposition validated: max error = {max_error:.2e}")
+
     return normal_displacement, tangent_displacement, total_displacement
 
 
 def compute_texture_difference_components(
     textures: List[torch.Tensor],
+    background_threshold: float = 0.05,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Compute pixel-wise texture difference decomposed into luminance, chrominance, and total components.
 
     Args:
         textures: List of texture tensors (H, W, 3) in range [0, 1]
                   Should contain exactly 2 textures (A and B)
+        background_threshold: Brightness threshold (0-1) below which pixels are masked as background
+                             in BOTH textures. Only masks if both textures are dark at that pixel.
+                             Lower values (e.g., 0.02) preserve more dark features.
+                             Higher values (e.g., 0.1) mask more aggressively.
+                             Default: 0.05 (5% brightness)
 
     Returns:
         Tuple of (luminance_diff, chroma_diff, delta_e):
@@ -84,9 +105,10 @@ def compute_texture_difference_components(
     texture_b = textures[1].cpu().numpy()  # (H, W, 3)
 
     # Identify background pixels (very dark, likely unused texture space)
+    # Only masks pixels where BOTH textures are dark (preserves intentional dark features)
     texture_a_brightness = texture_a.mean(axis=-1)  # (H, W)
     texture_b_brightness = texture_b.mean(axis=-1)  # (H, W)
-    is_background = (texture_a_brightness < 0.1) & (texture_b_brightness < 0.1)
+    is_background = (texture_a_brightness < background_threshold) & (texture_b_brightness < background_threshold)
 
     # Convert RGB to LAB color space (perceptually uniform)
     from skimage.color import rgb2lab, deltaE_ciede2000
@@ -352,12 +374,16 @@ def map_texture_difference_to_vertices(
 
     Args:
         difference_map: 2D difference map (H, W)
-        verts_uvs: UV coordinates (U, 2) - may be unique UVs
-        faces_uvs: Face UV indices (F, 3) - maps faces to UVs
-        num_vertices: Number of vertices in mesh
+        verts_uvs: Per-vertex UV coordinates (num_vertices, 2)
+                   Must already be expanded to per-vertex (not unique UVs)
+        faces_uvs: DEPRECATED - Not used. Pass None.
+        num_vertices: Number of vertices in mesh (must match verts_uvs.shape[0])
 
     Returns:
         Per-vertex difference values (num_vertices,)
+
+    Raises:
+        ValueError: If verts_uvs doesn't have exactly num_vertices UVs
     """
     import torch.nn.functional as F
     import logging
@@ -399,217 +425,18 @@ def map_texture_difference_to_vertices(
 
     logger.debug(f"UV difference: shape={uv_difference.shape}, min={uv_difference.min().item():.6f}, max={uv_difference.max().item():.6f}")
 
-    # Now expand per-UV difference to per-vertex difference
-    # If we have faces_uvs, use it to map UVs to vertices
-    if faces_uvs is not None and uv_difference.shape[0] != num_vertices:
-        logger.debug(f"Expanding {uv_difference.shape[0]} UV values to {num_vertices} vertices using faces_uvs")
-
-        # faces_uvs maps faces to UV indices: (F, 3)
-        # We need to create a vertex-to-UV mapping
-        # For each vertex, find which UV index it uses (via faces)
-
-        # This is complex, so let's use a simpler approach:
-        # Sample directly at each vertex's UV coordinate by duplicating UVs
-        # Actually, just duplicate the difference values according to which vertices share UVs
-
-        # Create a vertex difference array initialized to zero
-        vertex_difference = torch.zeros(num_vertices, dtype=uv_difference.dtype, device=uv_difference.device)
-
-        # For meshes with texture seams, verts_uvs is unique UVs (U, 2)
-        # We need to duplicate/expand to match all vertices
-        # The simplest approach: just return the UV difference and let the caller handle the mismatch
-        # OR: pad with zeros or repeat the mean
-        logger.warning(f"UV-to-vertex expansion not fully implemented. Using mean difference for unmapped vertices.")
-
-        # For now, use the mean of UV difference for all vertices
-        vertex_difference[:] = uv_difference.mean()
-
-        return vertex_difference
-    else:
-        # UV count matches vertex count - direct mapping
-        return uv_difference
-
-
-def create_texture_difference_visualization(
-    textures: List[torch.Tensor],
-    mesh,
-    renderer,
-    verts_uvs: torch.Tensor,
-    faces_uvs: Optional[torch.Tensor],
-    output_path: Path,
-    colormap: str = 'coolwarm',
-) -> bool:
-    """Create and save texture difference heatmap rendered on 3D mesh with colorbar.
-
-    Args:
-        textures: List of texture images
-        mesh: PyTorch3D Meshes object to render
-        renderer: MeshRenderer3D instance
-        verts_uvs: UV coordinates for vertices
-        faces_uvs: Face UV indices (optional)
-        output_path: Path to save heatmap
-        colormap: Matplotlib colormap name (diverging recommended)
-
-    Returns:
-        True if successful, False otherwise
-    """
-    # Compute 2D texture difference
-    difference_map = compute_texture_difference(textures)
-
-    # Map variance from 2D texture space to per-vertex values
-    # This avoids showing UV seam artifacts
-    import logging
-    logger = logging.getLogger(__name__)
-
-    # Get number of vertices from mesh
-    num_vertices = mesh.verts_packed().shape[0]
-    num_faces = mesh.faces_packed().shape[0]
-
-    # PyTorch3D uses indexed UVs: unique UVs + faces_uvs to index them
-    # We need to expand to per-vertex UVs by using the faces
-    logger.info(f"Checking mesh.textures: hasattr={hasattr(mesh, 'textures')}, is not None={mesh.textures is not None if hasattr(mesh, 'textures') else 'N/A'}")
-
-    # Check if mesh has TexturesUV (not TexturesVertex)
-    from pytorch3d.renderer import TexturesUV
-    has_texture_uv = (hasattr(mesh, 'textures') and mesh.textures is not None and
-                      isinstance(mesh.textures, TexturesUV))
-
-    if has_texture_uv:
-        logger.info("Using mesh.textures (TexturesUV) to expand UVs")
-        # Get unique UVs and face UV indices
-        unique_uvs = mesh.textures.verts_uvs_padded()[0]  # (U, 2) - 10,583 unique UVs
-        mesh_faces_uvs = mesh.textures.faces_uvs_padded()[0]  # (F, 3) - face UV indices
-        mesh_faces = mesh.faces_packed()  # (F, 3) - face vertex indices
-
-        logger.info(f"Mesh: {num_vertices} vertices, {num_faces} faces")
-        logger.info(f"Unique UVs: {unique_uvs.shape}, faces_uvs: {mesh_faces_uvs.shape}")
-
-        # Create per-vertex UVs by mapping vertex indices to UV indices via faces
-        # Initialize with zeros
-        per_vertex_uvs = torch.zeros(num_vertices, 2, dtype=unique_uvs.dtype, device=unique_uvs.device)
-
-        # For each face, assign the corresponding UV to each vertex
-        # Note: vertices on seams will have their UV overwritten multiple times
-        # We'll use the last assignment (arbitrary choice for seam vertices)
-        for face_idx in range(num_faces):
-            for corner in range(3):
-                vertex_idx = mesh_faces[face_idx, corner].item()
-                uv_idx = mesh_faces_uvs[face_idx, corner].item()
-                per_vertex_uvs[vertex_idx] = unique_uvs[uv_idx]
-
-        logger.info(f"Created per-vertex UVs: {per_vertex_uvs.shape}")
-        mesh_verts_uvs = per_vertex_uvs
-    else:
-        logger.info("Fallback: using provided verts_uvs and faces_uvs to expand")
-        # Mesh doesn't have textures attached - use provided UVs and faces_uvs
-        unique_uvs = verts_uvs
-        if unique_uvs.dim() == 3:
-            unique_uvs = unique_uvs[0]
-
-        logger.info(f"Provided UVs: {unique_uvs.shape}")
-
-        # If we have faces_uvs and UV count doesn't match vertex count, expand
-        if faces_uvs is not None and unique_uvs.shape[0] != num_vertices:
-            logger.info(f"Expanding {unique_uvs.shape[0]} UVs to {num_vertices} vertices using faces_uvs")
-
-            mesh_faces = mesh.faces_packed()
-            if faces_uvs.dim() == 3:
-                faces_uvs = faces_uvs[0]
-
-            # Create per-vertex UVs
-            per_vertex_uvs = torch.zeros(num_vertices, 2, dtype=unique_uvs.dtype, device=unique_uvs.device)
-
-            # Map vertex indices to UV indices via faces
-            for face_idx in range(num_faces):
-                for corner in range(3):
-                    vertex_idx = mesh_faces[face_idx, corner].item()
-                    uv_idx = faces_uvs[face_idx, corner].item()
-                    per_vertex_uvs[vertex_idx] = unique_uvs[uv_idx]
-
-            logger.info(f"Expanded to per-vertex UVs: {per_vertex_uvs.shape}")
-            mesh_verts_uvs = per_vertex_uvs
-        else:
-            logger.info(f"UVs already match vertices: {unique_uvs.shape}")
-            mesh_verts_uvs = unique_uvs
-
-    logger.info(f"Calling map_texture_difference_to_vertices with UVs shape: {mesh_verts_uvs.shape}, num_vertices: {num_vertices}")
-
-    vertex_difference = map_texture_difference_to_vertices(
-        difference_map,
-        mesh_verts_uvs,
-        None,  # Don't need faces_uvs anymore since we expanded
-        num_vertices
-    )
-
-    logger.info(f"Returned vertex_difference shape: {vertex_difference.shape}")
-
-    # Print statistics
-    logger.info("="*70)
-    logger.info("TEXTURE DIFFERENCE STATISTICS")
-    logger.info("="*70)
-    logger.info(f"  Min:     {vertex_difference.min().item():>10.6f} (A brighter)")
-    logger.info(f"  Max:     {vertex_difference.max().item():>10.6f} (B brighter)")
-    logger.info(f"  Mean:    {vertex_difference.mean().item():>10.6f}")
-    logger.info(f"  Median:  {vertex_difference.median().item():>10.6f}")
-    logger.info(f"  Std Dev: {vertex_difference.std().item():>10.6f}")
-    logger.info(f"  P10:     {torch.quantile(vertex_difference, 0.10).item():>10.6f}")
-    logger.info(f"  P90:     {torch.quantile(vertex_difference, 0.90).item():>10.6f}")
-    logger.info(f"  P95:     {torch.quantile(vertex_difference, 0.95).item():>10.6f}")
-    logger.info(f"  P99:     {torch.quantile(vertex_difference, 0.99).item():>10.6f}")
-    logger.info("")
-    logger.info(f"Interpretation:")
-    logger.info(f"  Positive (red)  = texture B brighter")
-    logger.info(f"  Zero (white)    = no difference")
-    logger.info(f"  Negative (blue) = texture A brighter")
-    logger.info("="*70)
-
-    # Render mesh with difference as vertex colors (like shape displacement)
-    # Handle both PyTorch3D and PyRender renderers
-    if hasattr(renderer, 'device') and renderer.device.type == 'cpu':
-        # PyRender renderer - convert to numpy
-        vertices_np = mesh.verts_packed().cpu().numpy()
-        faces_np = mesh.faces_packed().cpu().numpy()
-        difference_np = vertex_difference.cpu().numpy()
-
-        logger.debug(f"Texture heatmap: vertices={vertices_np.shape}, faces={faces_np.shape}, difference={difference_np.shape}")
-        logger.debug(f"Texture difference: min={difference_np.min():.6f}, max={difference_np.max():.6f}, mean={difference_np.mean():.6f}")
-
-        # Check for vertex count mismatch
-        if difference_np.shape[0] != vertices_np.shape[0]:
-            error_msg = f"Vertex count mismatch: mesh has {vertices_np.shape[0]} vertices but difference has {difference_np.shape[0]} values"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-
-        image = renderer.render_with_heatmap(
-            vertices_np,
-            faces_np,
-            difference_np,
-            colormap=colormap,
-            add_colorbar=True,
-            title="Texture Difference Heatmap",
-            normalize_values=False,  # Don't normalize - show raw signed differences
-            symmetric_diverging=True,  # Use symmetric range around 0
-            normalize_colorbar=False  # Show actual values on colorbar
+    # Validate that UV count matches vertex count
+    # The caller should have already expanded unique UVs to per-vertex UVs before calling this function
+    if uv_difference.shape[0] != num_vertices:
+        error_msg = (
+            f"UV count mismatch: got {uv_difference.shape[0]} UVs but mesh has {num_vertices} vertices. "
+            f"The verts_uvs parameter must be per-vertex UVs (not unique UVs). "
+            f"Expand UVs using face indices before calling this function."
         )
-    else:
-        # PyTorch3D renderer - use original parameters
-        image = renderer.render_with_heatmap(
-            mesh,
-            vertex_difference,
-            colormap=colormap,
-            add_colorbar=True,
-            title="Texture Difference Heatmap",
-            normalize_values=False,  # Don't normalize - show raw signed differences
-            symmetric_diverging=True,  # Use symmetric range around 0
-            normalize_colorbar=False  # Show actual values on colorbar
-        )
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
-    # Save image
-    from PIL import Image
-    img = Image.fromarray(image)
-    img.save(output_path)
-
-    return output_path.exists()
+    return uv_difference
 
 
 def create_texture_difference_components_visualization(

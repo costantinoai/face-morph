@@ -18,7 +18,7 @@ def create_optimal_renderer(device: torch.device, image_size: int = 512):
 
     Strategy:
     - GPU (CUDA): Use PyTorch3D for GPU-accelerated rendering
-    - CPU: Use PyRender (OpenGL/OSMesa) - 50-100x faster than PyTorch3D on CPU
+    - CPU: Use PyRender (OpenGL/OSMesa)
 
     This function abstracts renderer selection so the pipeline
     doesn't need to know about implementation details.
@@ -60,8 +60,8 @@ def create_optimal_renderer(device: torch.device, image_size: int = 512):
             ) from e
 
     else:
-        # CPU: Use PyRender (OpenGL/OSMesa - 50-100x faster than PyTorch3D on CPU)
-        logger.info("Creating PyRender renderer (CPU mode - 50-100x faster)")
+        # CPU: Use PyRender (OpenGL/OSMesa)
+        logger.info("Creating PyRender renderer (CPU mode)")
         try:
             from face_morph.rendering.pyrender import create_pyrender_renderer
             renderer = create_pyrender_renderer(image_size=image_size)

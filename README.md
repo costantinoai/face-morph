@@ -22,8 +22,8 @@ This package provides tools for morphing 3D face meshes with texture support:
 
 ```bash
 # Install
-git clone https://github.com/costantinoai/face-morph-laura.git
-cd face-morph-laura
+git clone https://github.com/costantinoai/face-morph.git
+cd face-morph
 conda create -n face-morph python=3.10
 conda activate face-morph
 pip install -e .
@@ -49,8 +49,8 @@ Suitable for most users. Uses PyRender (OpenGL-based) for fast CPU rendering.
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/costantinoai/face-morph-laura.git
-cd face-morph-laura
+git clone https://github.com/costantinoai/face-morph.git
+cd face-morph
 
 # 2. Create environment
 conda create -n face-morph python=3.10
@@ -329,7 +329,7 @@ See `pyproject.toml` for complete dependency list.
 ## Project Structure
 
 ```
-face-morph-laura/
+face-morph/
 ├── src/face_morph/
 │   ├── cli/              # Command-line interface
 │   ├── core/             # Mesh I/O, morphing

@@ -1,10 +1,9 @@
-"""Pyrender-based Mesh Renderer - Fast CPU rendering with OpenGL.
+"""Pyrender-based Mesh Renderer - CPU rendering with OpenGL.
 
-Performance:
+Performance benchmarks:
 - CPU (Mesa OSMesa): ~1-2s per frame
 - CPU (OpenGL): ~0.5s per frame
 - GPU (OpenGL): ~0.2s per frame
-- 50-100x faster than PyTorch3D on CPU
 
 Note: PyRender requires 1:1 mapping between vertices and UVs.
 Meshes with texture seams need vertex duplication.
@@ -84,12 +83,11 @@ def split_vertices_at_seams(vertices, faces, uv_coords, uv_faces):
 
 
 class PyRenderMeshRenderer(BaseRenderer):
-    """OpenGL-based mesh renderer using pyrender (fast CPU rendering).
+    """OpenGL-based mesh renderer using pyrender.
 
     Uses:
     - OSMesa for pure CPU rendering
     - OpenGL for GPU/integrated GPU acceleration
-    - Much faster than PyTorch3D on CPU (50-100x)
     """
 
     def __init__(

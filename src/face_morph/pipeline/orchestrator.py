@@ -92,7 +92,7 @@ def run_morphing_pipeline(config: MorphConfig) -> Path:
         ├── shape_displacement_components.png
         ├── texture_difference_components.png
         ├── animation.mp4
-        └── statistics.csv  # TODO: Week 3
+        └── statistics.csv
 
     Example:
         >>> config = MorphConfig(
@@ -241,7 +241,7 @@ def run_morphing_pipeline(config: MorphConfig) -> Path:
     if renderer_type == 'pytorch3d':
         log("  Renderer: PyTorch3D (GPU-accelerated)")
     else:
-        log("  Renderer: PyRender (CPU mode - 50-100x faster)")
+        log("  Renderer: PyRender (CPU mode)")
 
     # Initialize device manager to track and minimize transfers
     from face_morph.utils.device import DeviceManager, optimize_texture_device

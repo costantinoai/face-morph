@@ -24,8 +24,8 @@ logger = get_logger(__name__)
 # JIT-Compiled Helper Functions (torch.compile for max performance)
 # ============================================================================
 
-# TODO: torch.compile disabled due to CUDA Graphs memory usage (1.94 GiB)
-# Re-enable once GPU memory is optimized
+# NOTE: torch.compile currently disabled due to CUDA Graphs memory usage (1.94 GiB)
+# Can be re-enabled if GPU memory optimization is needed
 # @torch.compile(mode="reduce-overhead", dynamic=True)
 def _vectorized_vertex_lerp(verts1: torch.Tensor, verts2: torch.Tensor, ratios: torch.Tensor) -> torch.Tensor:
     """
