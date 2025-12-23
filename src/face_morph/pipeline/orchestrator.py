@@ -439,12 +439,15 @@ def run_morphing_pipeline(config: MorphConfig) -> Path:
             [texture1, texture2]
         )
 
+    # Define heatmap paths
+    shape_heatmap_path = pair_dir / "shape_displacement_components.png"
+    texture_heatmap_path = pair_dir / "texture_difference_components.png"
+
     # Generate heatmaps in parallel using ThreadPoolExecutor (3-6x faster)
     from concurrent.futures import ThreadPoolExecutor
 
     def generate_shape_heatmap():
         """Worker function for shape heatmap generation."""
-        shape_heatmap_path = pair_dir / "shape_displacement_components.png"
         try:
             success = create_shape_displacement_visualization(
                 mesh1_for_heatmap,
@@ -458,7 +461,6 @@ def run_morphing_pipeline(config: MorphConfig) -> Path:
 
     def generate_texture_heatmap():
         """Worker function for texture heatmap generation."""
-        texture_heatmap_path = pair_dir / "texture_difference_components.png"
         try:
             success = create_texture_difference_components_visualization(
                 [texture1, texture2],

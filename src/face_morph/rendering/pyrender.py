@@ -466,9 +466,11 @@ class PyRenderMeshRenderer(BaseRenderer):
 
     def cleanup(self):
         """Clean up renderer resources."""
-        if self.use_offscreen and self.renderer is not None:
-            self.renderer.delete()
-            self.renderer = None
+        # Defensive check: ensure attributes exist before accessing
+        if hasattr(self, 'use_offscreen') and self.use_offscreen:
+            if hasattr(self, 'renderer') and self.renderer is not None:
+                self.renderer.delete()
+                self.renderer = None
         logger.debug("PyRender renderer cleaned up")
 
     def __del__(self):
@@ -489,4 +491,8 @@ def create_pyrender_renderer(
     Returns:
         Configured PyRenderMeshRenderer instance
     """
-    return PyRenderMeshRenderer(image_size, background_color)
+    return PyRenderMeshRenderer(
+        device=None,  # PyRender always uses CPU
+        image_size=image_size,
+        background_color=background_color
+    )
