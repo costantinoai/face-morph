@@ -255,12 +255,9 @@ class PipelineStages:
             log: Logging function
 
         Returns:
-            Tuple of (rendered_images, fbx_success_count)
+            Tuple of (rendered_images, mesh_export_count)
         """
         log("STEP 7: Rendering and saving frames...")
-
-        # Create temporary directory for OBJ files
-        temp_dir = Path(tempfile.mkdtemp())
 
         # Free GPU memory from morphing
         if config.device.type == 'cuda':
@@ -268,7 +265,6 @@ class PipelineStages:
 
         # Prepare for rendering
         rendered_images = []
-        obj_fbx_pairs = []  # For FBX conversion (full mode only)
 
         verts_uvs = aux1['verts_uvs'] if has_textures and aux1.get('verts_uvs') is not None else None
         faces_uvs = aux1.get('faces_uvs') if has_textures else None
@@ -365,12 +361,8 @@ class PipelineStages:
 
             # Save OBJ if full mode (sequential - PyTorch Meshes don't pickle well)
             if config.should_export_meshes:
-                obj_path = temp_dir / f"{morph_name}.obj"
+                obj_path = mesh_dir / f"{morph_name}.obj"
                 save_mesh(mesh, obj_path, aux1['verts_uvs'], texture if has_textures else None)
-
-                # Queue for FBX conversion
-                fbx_path = mesh_dir / f"{morph_name}.fbx"
-                obj_fbx_pairs.append((obj_path, fbx_path, morph_name))
 
         # Save PNGs in parallel
         with Pool(processes=config.num_workers) as pool:
@@ -379,43 +371,13 @@ class PipelineStages:
         png_success = sum(1 for _, success in png_results if success)
         log(f"  Saved {png_success}/{len(png_save_tasks)} PNG files")
 
-        # === CONVERT OBJ TO FBX ===
-        fbx_success = 0
+        # Log mesh export if enabled
         if config.should_export_meshes:
-            log("  Converting OBJ to FBX...")
-
-            if config.parallel_fbx and len(obj_fbx_pairs) > 1:
-                # Async parallel conversion (20-40% faster than multiprocessing)
-                from face_morph.utils.io_optimizer import AsyncFBXConverter
-
-                max_concurrent = min(4, len(obj_fbx_pairs))
-                log(f"    Using async conversion (max {max_concurrent} concurrent)")
-
-                converter = AsyncFBXConverter(
-                    blender_path=config.blender_path,
-                    max_concurrent=max_concurrent
-                )
-
-                # Convert using async I/O (overlaps subprocess waits)
-                fbx_results = converter.convert_batch_sync(obj_fbx_pairs)
-
-                fbx_success = sum(1 for _, success in fbx_results if success)
-                log(f"  Converted {fbx_success}/{len(obj_fbx_pairs)} FBX files")
-            else:
-                # Sequential conversion (fallback for single file or disabled parallel)
-                log("    Using sequential conversion")
-                from face_morph.core.converter import convert_obj_to_fbx
-                for obj_path, fbx_path, name in obj_fbx_pairs:
-                    if convert_obj_to_fbx(obj_path, fbx_path, blender_path=config.blender_path):
-                        fbx_success += 1
-                log(f"  Converted {fbx_success}/{len(obj_fbx_pairs)} FBX files")
-
-        # Cleanup temporary OBJ files
-        shutil.rmtree(temp_dir, ignore_errors=True)
+            log(f"  Saved {len(morphed_results)}/{len(morphed_results)} OBJ files")
 
         log("")
 
-        return rendered_images, fbx_success
+        return rendered_images, len(morphed_results) if config.should_export_meshes else 0
 
     @staticmethod
     def generate_visualizations(

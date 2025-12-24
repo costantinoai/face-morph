@@ -194,12 +194,11 @@ docker run --rm \
 - ~11.8 seconds per pair
 - 100% success rate
 
-### Not Recommended: Full Mode
+### Full Mode (With Meshes + Video + CSV)
 
-**Why:** Blender FBX export has compatibility issues in Docker
+**Best for:** Research requiring mesh files or comprehensive data export
 
 ```bash
-# This will work but may have FBX export failures
 docker run --rm \
   -v $(pwd)/data:/workspace/data:ro \
   -v $(pwd)/results:/workspace/results:rw \
@@ -207,12 +206,13 @@ docker run --rm \
   batch /workspace/data --cpu
 ```
 
-**Issues:**
-- FBX mesh export fails with Blender plugin errors
-- Adds significant overhead without benefits
-- PNG frames and heatmaps work fine
+**Output:**
+- Everything from minimal mode
+- 41 OBJ mesh files (per pair)
+- MP4 video animation
+- CSV data files (statistics, vertex displacements, texture differences)
 
-**Recommendation:** Use native installation for full mode with mesh export needs
+**Note:** Full mode takes longer due to mesh export and video encoding
 
 ### Single Pair Processing
 
@@ -387,7 +387,7 @@ sudo cat /etc/docker/daemon.json
 
 ### CPU Image
 - ✅ Minimal mode: Fully functional
-- ❌ Full mode: FBX export fails (use native install for mesh export)
+- ✅ Full mode: Fully functional (OBJ mesh export)
 - ✅ Rendering: Works perfectly with Xvfb
 - ✅ Batch processing: 100% reliable
 
@@ -412,18 +412,18 @@ sudo cat /etc/docker/daemon.json
 | **Setup Time** | 10-30 min | 1 min build | 18 min build |
 | **Disk Space** | ~3-5 GB | 2.65 GB | 15.2 GB |
 | **Minimal Mode** | ✅ Perfect | ✅ Perfect | ⚠️ Heatmap issue |
-| **Full Mode** | ✅ Perfect | ❌ FBX fails | ❌ FBX + scipy |
+| **Full Mode** | ✅ Perfect | ✅ Perfect | ⚠️ scipy heatmap issue |
 | **Portability** | Low | High | High |
 | **Reproducibility** | Medium | High | High |
 | **Performance** | 100% | ~95% | ~98% |
 | **GPU Setup** | Complex | N/A | Moderate |
 
 **Recommendations:**
-- **Production batch processing:** Docker CPU with `--minimal`
-- **Need mesh exports:** Native installation
-- **Development:** Native installation
+- **Production batch processing (PNG + heatmaps):** Docker CPU with `--minimal` (fastest)
+- **Research with mesh files:** Docker CPU or GPU with full mode (includes OBJ meshes)
+- **Development:** Native installation (faster iteration)
 - **Cloud/HPC deployment:** Docker CPU
-- **GPU workflows:** Native installation (better compatibility)
+- **GPU workflows with heatmaps:** Native installation (avoids scipy issue)
 
 ## Advanced Usage
 

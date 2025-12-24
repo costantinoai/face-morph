@@ -180,7 +180,7 @@ def run_morphing_pipeline(config: MorphConfig) -> Path:
     # STAGE 4: Render and save results
     # -------------------------------------------------------------------------
 
-    rendered_images, fbx_success = PipelineStages.render_and_save(
+    rendered_images, mesh_export_count = PipelineStages.render_and_save(
         config, renderer, morphed_results, aux1, has_textures,
         stim1_name, stim2_name, png_dir, mesh_dir, log
     )
@@ -215,7 +215,7 @@ def run_morphing_pipeline(config: MorphConfig) -> Path:
     log(f"  PNG frames: {png_dir}/")
 
     if config.should_export_meshes:
-        log(f"  FBX meshes: {mesh_dir}/")
+        log(f"  OBJ meshes: {mesh_dir}/")
 
     shape_heatmap_path = pair_dir / "shape_displacement_components.png"
     if shape_heatmap_path.exists():

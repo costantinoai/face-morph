@@ -205,7 +205,7 @@ results/YYYYMMDD_HHMMSS/face1_face2/
 
 Includes everything above **plus:**
 ```
-├── mesh/                                   # 41 OBJ + FBX mesh files
+├── mesh/                                   # 41 OBJ mesh files
 ├── animation.mp4                           # MP4 video (30 FPS)
 ├── statistics.csv                          # Summary metrics
 ├── vertex_displacements.csv                # Per-vertex data
@@ -302,10 +302,10 @@ See profiling documentation in `PROFILING_SUMMARY.md`.
 - GPU mode only: Install PyTorch3D from source (see `environment.yml`)
 - Or use CPU mode: `--cpu` (uses PyRender instead)
 
-**Slow FBX conversion**
-- Expected: Blender conversion takes ~1-2s per mesh
-- Use `--minimal` to skip FBX export of morphed meshes
-- Pre-convert to OBJ format if possible
+**Mesh export overhead**
+- Full mode exports 41 OBJ mesh files
+- Use `--minimal` to skip mesh export for faster processing
+- Minimal mode includes PNG frames and heatmaps (sufficient for most use cases)
 
 ### Platform-Specific Notes
 

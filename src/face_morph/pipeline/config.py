@@ -195,10 +195,10 @@ class MorphConfig:
     @property
     def should_export_meshes(self) -> bool:
         """
-        Whether to export OBJ/FBX meshes.
+        Whether to export OBJ meshes.
 
         In minimal mode, meshes are not exported (faster, smaller output).
-        In full mode (default), all 41 meshes are exported as OBJ and FBX.
+        In full mode (default), all 41 meshes are exported as OBJ files.
 
         Returns:
             True if output_mode is 'full'
