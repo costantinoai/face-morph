@@ -119,21 +119,6 @@ Includes everything above **plus:**
 └── texture_differences.csv                 # Per-pixel texture data
 ```
 
-## Performance
-
-Real-world benchmarks (NVIDIA RTX 3080 Laptop, 18K vertex meshes, 41 frames per pair):
-
-### Batch Processing (6 Pairs)
-
-| Configuration | Total Time | Per-Pair | Throughput | Speedup |
-|---------------|------------|----------|------------|---------|
-| GPU + Minimal | 29.4s | 4.8s | 0.20 pairs/s | 2.1x |
-| GPU + Full | 247.8s | 41.1s | 0.02 pairs/s | 0.25x |
-| CPU + Minimal | 61.8s | 10.2s | 0.10 pairs/s | 1.0x |
-| CPU + Full | 277.3s | 46.2s | 0.02 pairs/s | 0.22x |
-
-For batches over 100 pairs, GPU with --minimal provides significant time savings.
-
 ## Heatmaps
 
 ### Shape Displacement
@@ -149,33 +134,6 @@ Three perceptual components:
 - **Luminance:** Brightness differences
 - **Chrominance:** Color/saturation differences
 - **ΔE (CIEDE2000):** Perceptual color difference (industry standard)
-
-## Development
-
-### Running Tests
-
-```bash
-# Install dev dependencies
-pip install pytest pytest-cov
-
-# Run tests
-pytest tests/
-
-# With coverage
-pytest --cov=face_morph tests/
-```
-
-### Profiling
-
-```bash
-# Comprehensive profiling
-python scripts/profile_comprehensive.py --mode gpu --frames 41
-
-# Real-world CLI testing
-python scripts/profile_cli_batch.py
-```
-
-See profiling documentation in `PROFILING_SUMMARY.md`.
 
 ## Troubleshooting
 
@@ -228,17 +186,10 @@ If you use this tool in your research, please cite:
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
-
-- [PyTorch3D](https://github.com/facebookresearch/pytorch3d) - GPU-accelerated 3D rendering
-- [PyRender](https://github.com/mmatl/pyrender) - CPU rendering backend
-- [Blender](https://www.blender.org/) - FBX/OBJ conversion
-
 ## Documentation
 
 - [INSTALLATION.md](INSTALLATION.md) - Bare metal installation on Windows, macOS, Linux
 - [DOCKER.md](DOCKER.md) - Docker deployment and GPU setup
-- `PROFILING_SUMMARY.md` - Performance profiling and benchmarks
 
 ## Contributing
 
