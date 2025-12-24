@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # GPU-accelerated service (requires NVIDIA GPU + NVIDIA Container Toolkit)
+  face-morph-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    image: face-morph:gpu
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+    volumes:
+      # Mount local data directory for input files
+      - ./data:/workspace/data:ro
+      # Mount local results directory for output
+      - ./results:/workspace/results:rw
+    # Override with your specific command
+    # Example: docker-compose run face-morph-gpu morph /workspace/data/face1.fbx /workspace/data/face2.fbx --gpu
+    command: ["--help"]
+    shm_size: '2gb'  # Increase shared memory for PyTorch data loaders
+
+  # CPU-only service (works on any machine)
+  face-morph-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    image: face-morph:cpu
+    volumes:
+      # Mount local data directory for input files
+      - ./data:/workspace/data:ro
+      # Mount local results directory for output
+      - ./results:/workspace/results:rw
+    # Override with your specific command
+    # Example: docker-compose run face-morph-cpu morph /workspace/data/face1.fbx /workspace/data/face2.fbx --cpu
+    command: ["--help"]
+
+# Example usage:
+#
+# Build images:
+#   docker-compose build face-morph-cpu
+#   docker-compose build face-morph-gpu
+#
+# Run CPU version:
+#   docker-compose run --rm face-morph-cpu morph /workspace/data/face1.fbx /workspace/data/face2.fbx --cpu
+#
+# Run GPU version:
+#   docker-compose run --rm face-morph-gpu morph /workspace/data/face1.fbx /workspace/data/face2.fbx --gpu
+#
+# Batch process folder (CPU):
+#   docker-compose run --rm face-morph-cpu batch /workspace/data --cpu
+#
+# Batch process folder (GPU):
+#   docker-compose run --rm face-morph-gpu batch /workspace/data --gpu
+#
+# Interactive shell (for debugging):
+#   docker-compose run --rm --entrypoint /bin/bash face-morph-cpu
+#   docker-compose run --rm --entrypoint /bin/bash face-morph-gpu
