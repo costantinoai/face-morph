@@ -29,7 +29,7 @@ cd face-morph
 docker build -f Dockerfile.cpu -t face-morph:cpu .
 ```
 
-First build takes ~1 minute. Subsequent builds use cache and are much faster.
+First build takes ~10 minutes. Subsequent builds use cache and are much faster.
 
 **Step 3: Run face morphing**
 
