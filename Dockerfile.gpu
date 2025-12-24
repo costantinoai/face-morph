@@ -106,11 +106,13 @@ RUN pip install --no-cache-dir --no-build-isolation \
     "git+https://github.com/facebookresearch/pytorch3d.git@v0.7.9"
 
 # ===================================================================
-# Install all other dependencies
+# Install all dependencies via pip (same as CPU Docker)
 # ===================================================================
+# Using numpy<2.0 constraint to avoid compatibility issues
+# Using scipy==1.11.4 to avoid ELF alignment issues with 1.15.x on Ubuntu 22.04
 RUN pip install --no-cache-dir \
     "numpy>=1.24.0,<2.0" \
-    "scipy>=1.11.0" \
+    "scipy==1.11.4" \
     "pillow>=10.0.0" \
     "matplotlib>=3.7.0" \
     "scikit-image>=0.21.0" \
@@ -128,7 +130,8 @@ COPY README.md /tmp/face-morph/
 COPY LICENSE /tmp/face-morph/
 
 WORKDIR /tmp/face-morph
-RUN pip install --no-cache-dir .[cuda]
+# Install without dependencies to avoid reinstalling scipy/numpy
+RUN pip install --no-cache-dir --no-deps .[cuda]
 
 # ===================================================================
 # Aggressive cleanup to minimize what we copy to stage 2
