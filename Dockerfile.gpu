@@ -1,5 +1,5 @@
-# Highly Optimized GPU-accelerated Docker image for face-morph
-# Target: <6GB (from potential ~10-12GB with conda)
+# Multi-stage GPU-accelerated Docker image for face-morph
+# Final size: 15.2 GB
 # Requires NVIDIA GPU and NVIDIA Container Toolkit on host
 #
 # KEY OPTIMIZATIONS:
@@ -37,8 +37,8 @@
 # ===================================================================
 # USAGE
 # ===================================================================
-# Build: docker build -f Dockerfile.gpu.optimized -t face-morph:gpu-optimized .
-# Run:   docker run --rm --gpus all -v $(pwd)/data:/workspace/data -v $(pwd)/results:/workspace/results face-morph:gpu-optimized morph /workspace/data/face1.fbx /workspace/data/face2.fbx --gpu
+# Build: docker build -f Dockerfile.gpu -t face-morph:gpu .
+# Run:   docker run --rm --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all -v $(pwd)/data:/workspace/data:ro -v $(pwd)/results:/workspace/results:rw face-morph:gpu batch /workspace/data --gpu --minimal
 
 # ===================================================================
 # STAGE 1: Builder - Compile PyTorch3D with CUDA support

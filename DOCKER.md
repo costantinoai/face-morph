@@ -1,10 +1,12 @@
 # Docker Implementation for face-morph
 
-Optimized Docker containers for 3D face morphing with CPU and GPU support.
+Docker containers for 3D face morphing with CPU and GPU support.
 
 ## Quick Start
 
-### CPU Mode (Recommended)
+### CPU Mode (Recommended - No CUDA Setup Required)
+
+Easiest option. Works on any machine without GPU drivers or CUDA toolkit.
 
 ```bash
 # Build
@@ -25,9 +27,9 @@ docker run --rm \
   morph /workspace/data/face1.fbx /workspace/data/face2.fbx --cpu --minimal
 ```
 
-### GPU Mode (Requires NVIDIA Setup)
+### GPU Mode (For Large Batches)
 
-**Prerequisites**: NVIDIA Container Toolkit must be installed (see [GPU Setup](#gpu-setup) below)
+Use for processing many face pairs (100+). Requires NVIDIA Container Toolkit installation (see [GPU Setup](#gpu-setup) below).
 
 ```bash
 # Build
@@ -53,7 +55,7 @@ docker run --rm --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all \
 | **Rendering** | Xvfb + Mesa software OpenGL |
 | **Python Packages** | Pure pip (no conda overhead) |
 | **PyTorch** | 2.9.1+cpu (CPU-only optimized) |
-| **Status** | ✅ Fully functional |
+| **Status** | Fully functional |
 
 **Key Optimizations:**
 1. Multi-stage build (builder + runtime)
@@ -77,7 +79,7 @@ docker run --rm --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all \
 | **CUDA Version** | 12.4 |
 | **PyTorch** | 2.5.1+cu124 |
 | **PyTorch3D** | 0.7.9 (compiled with CUDA) |
-| **Status** | ⚠️ Core functionality working (minor scipy heatmap issue) |
+| **Status** | Core functionality working (minor scipy heatmap issue) |
 
 **Requirements:**
 - NVIDIA GPU with CUDA support
@@ -171,9 +173,9 @@ docker run --rm --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all \
 
 ## Usage Patterns
 
-### Recommended: Batch Minimal Mode
+### Batch Minimal Mode (Recommended)
 
-**Best for:** Production workflows, research, fast iteration
+CPU mode is simplest - no CUDA setup required. Use GPU for large batches (100+ pairs).
 
 ```bash
 docker run --rm \
@@ -196,7 +198,7 @@ docker run --rm \
 
 ### Full Mode (With Meshes + Video + CSV)
 
-**Best for:** Research requiring mesh files or comprehensive data export
+Use when you need OBJ mesh files or comprehensive data export.
 
 ```bash
 docker run --rm \
@@ -386,24 +388,24 @@ sudo cat /etc/docker/daemon.json
 ## Known Limitations
 
 ### CPU Image
-- ✅ Minimal mode: Fully functional
-- ✅ Full mode: Fully functional (OBJ mesh export)
-- ✅ Rendering: Works perfectly with Xvfb
-- ✅ Batch processing: 100% reliable
+- Minimal mode: Fully functional
+- Full mode: Fully functional (OBJ mesh export)
+- Rendering: Works with Xvfb
+- Batch processing: 100% reliable
 
 ### GPU Image
-- ✅ Morphing: Fully functional
-- ✅ Rendering: GPU-accelerated, works perfectly
-- ⚠️ Heatmaps: scipy OpenBLAS error (doesn't affect PNG/morph output)
-- ⚠️ Requires NVIDIA Container Toolkit setup
+- Morphing: Fully functional
+- Rendering: GPU-accelerated
+- Heatmaps: scipy OpenBLAS error (doesn't affect PNG/morph output)
+- Requires NVIDIA Container Toolkit setup
 
-## Best Practices
+## Configuration Notes
 
-1. **Use Minimal Mode:** Faster, more reliable, sufficient for most use cases
-2. **Read-Only Input:** Mount data with `:ro` to prevent accidental modifications
-3. **Specific Tags:** Tag images with versions (`face-morph:cpu-v1.0.0`)
-4. **Resource Limits:** Set memory/CPU limits for production deployments
-5. **Regular Updates:** Rebuild images periodically for security patches
+1. **Minimal vs Full Mode:** Minimal mode skips mesh export and video generation, reducing processing time by ~75%
+2. **Volume Mounts:** Use `:ro` (read-only) for input data, `:rw` (read-write) for output
+3. **Image Tags:** Tag images with versions for reproducibility (`face-morph:cpu-v1.0.0`)
+4. **Resource Limits:** Use `--memory` and `--cpus` flags for production deployments
+5. **Security Updates:** Rebuild images periodically to incorporate base image security patches
 
 ## Comparison: Docker vs Native
 
@@ -411,19 +413,19 @@ sudo cat /etc/docker/daemon.json
 |--------|--------|------------|------------|
 | **Setup Time** | 10-30 min | 1 min build | 18 min build |
 | **Disk Space** | ~3-5 GB | 2.65 GB | 15.2 GB |
-| **Minimal Mode** | ✅ Perfect | ✅ Perfect | ⚠️ Heatmap issue |
-| **Full Mode** | ✅ Perfect | ✅ Perfect | ⚠️ scipy heatmap issue |
+| **Minimal Mode** | Working | Working | Heatmap issue |
+| **Full Mode** | Working | Working | scipy heatmap issue |
 | **Portability** | Low | High | High |
 | **Reproducibility** | Medium | High | High |
 | **Performance** | 100% | ~95% | ~98% |
-| **GPU Setup** | Complex | N/A | Moderate |
+| **GPU Setup** | Complex | None | Moderate |
 
-**Recommendations:**
-- **Production batch processing (PNG + heatmaps):** Docker CPU with `--minimal` (fastest)
-- **Research with mesh files:** Docker CPU or GPU with full mode (includes OBJ meshes)
-- **Development:** Native installation (faster iteration)
+**Mode Selection:**
+- **Easiest setup:** Docker CPU (no CUDA dependencies)
+- **Large batches (100+ pairs):** Docker GPU with `--minimal` flag
+- **Mesh export required:** Docker CPU or GPU with full mode
+- **Development:** Native installation
 - **Cloud/HPC deployment:** Docker CPU
-- **GPU workflows with heatmaps:** Native installation (avoids scipy issue)
 
 ## Advanced Usage
 
@@ -460,13 +462,14 @@ docker run --rm \
   --cpu --log-level DEBUG --minimal
 ```
 
+## Additional Documentation
+
+- [README.md](README.md) - Quick start and usage examples
+- [INSTALLATION.md](INSTALLATION.md) - Bare metal installation on Windows, macOS, Linux
+
 ## Resources
 
 - [NVIDIA Container Toolkit Installation](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 - [Docker Best Practices](https://docs.docker.com/develop/dev-best-practices/)
 - [PyRender Headless Rendering](https://pyrender.readthedocs.io/en/latest/examples/offscreen.html)
 - [Xvfb Documentation](https://www.x.org/releases/X11R7.6/doc/man/man1/Xvfb.1.xhtml)
-
----
-
-**Last Updated:** 2025-12-23 | **Version:** 1.0.0 | **Status:** Production Ready

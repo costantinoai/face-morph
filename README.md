@@ -8,6 +8,48 @@
 
 ![Morphing Animation](assets/demo_morph.gif)
 
+## Quick Start
+
+### Docker CPU (Recommended)
+
+Easiest way to get started. No CUDA setup required, works on any machine.
+
+**Single Pair:**
+```bash
+# Build image
+docker build -f Dockerfile.cpu -t face-morph:cpu .
+
+# Process two faces
+docker run --rm \
+  -v $(pwd)/data:/workspace/data:ro \
+  -v $(pwd)/results:/workspace/results:rw \
+  face-morph:cpu \
+  morph /workspace/data/face1.fbx /workspace/data/face2.fbx --cpu --minimal
+```
+
+**Batch Processing:**
+```bash
+# Process all pairs in a folder
+docker run --rm \
+  -v $(pwd)/data:/workspace/data:ro \
+  -v $(pwd)/results:/workspace/results:rw \
+  face-morph:cpu \
+  batch /workspace/data --cpu --minimal
+```
+
+Results saved to `results/YYYYMMDD_HHMMSS/`
+
+**Common Options:**
+- `--cpu` / `--gpu` - Device selection (use `--cpu` for Docker CPU image)
+- `--minimal` - Fast mode, PNG + heatmaps only (recommended)
+- `-o, --output DIR` - Output directory (default: `results/`)
+- `--log-level LEVEL` - DEBUG|INFO|WARNING|ERROR (default: INFO)
+- `--blender PATH` - Path to Blender executable (default: auto-detect)
+
+**GPU Docker:** For large batches (100+ pairs), see [DOCKER.md](DOCKER.md) for GPU setup instructions.
+
+**Bare Metal Installation:** For native installation without Docker, see [INSTALLATION.md](INSTALLATION.md).
+
 ## Features
 
 - Linear interpolation between 3D face meshes with texture support
@@ -16,140 +58,13 @@
 - CSV export for quantitative analysis
 - MP4 video generation from morph sequences
 
-## Quick Start
-
-```bash
-# Clone and install
-git clone https://github.com/costantinoai/face-morph.git
-cd face-morph
-conda env create -f environment.yml
-conda activate face-morph
-pip install -e .
-
-# Run (GPU mode)
-face-morph morph face1.fbx face2.fbx --gpu
-
-# Batch process folder (recommended)
-face-morph batch data/ --gpu --minimal
-```
-
-Results saved to `results/YYYYMMDD_HHMMSS/`
-
-## Installation
-
-### Prerequisites
-
-- **Python 3.9-3.12** (3.10 recommended)
-- **Conda** ([Miniforge](https://github.com/conda-forge/miniforge) or Anaconda)
-- **Blender 3.6+** (for FBX conversion, auto-detected)
-- **FFmpeg** (optional, for video generation)
-
-### CPU-Only (Cross-Platform)
-
-```bash
-git clone https://github.com/costantinoai/face-morph.git
-cd face-morph
-
-# Create environment
-conda create -n face-morph python=3.10
-conda activate face-morph
-
-# Install dependencies
-conda install -c conda-forge numpy scipy pillow matplotlib scikit-image trimesh tqdm click
-conda install pytorch torchvision cpuonly -c pytorch
-pip install pyrender
-pip install -e .
-```
-
-### GPU (Linux/Windows with CUDA)
-
-```bash
-git clone https://github.com/costantinoai/face-morph.git
-cd face-morph
-
-# Use pre-configured environment
-conda env create -f environment.yml
-conda activate face-morph
-pip install -e .
-
-# Verify CUDA
-python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
-```
-
-**Note:** GPU mode requires CUDA-compatible NVIDIA GPU. macOS does not support CUDA.
-
-### Docker (Recommended)
-
-#### CPU Mode (No Setup Required)
-
-```bash
-# Build locally
-docker build -f Dockerfile.cpu -t face-morph:cpu .
-
-# Run
-docker run --rm \
-  -v $(pwd)/data:/workspace/data:ro \
-  -v $(pwd)/results:/workspace/results:rw \
-  face-morph:cpu \
-  morph /workspace/data/face1.fbx /workspace/data/face2.fbx --cpu
-```
-
-#### GPU Mode (Requires NVIDIA Setup)
-
-**Prerequisites:**
-- NVIDIA GPU with CUDA support
-- NVIDIA drivers installed (≥418.81.07)
-- Docker ≥19.03
-
-**1. Install NVIDIA Container Toolkit** (one-time setup)
-
-**Ubuntu/Debian:**
-```bash
-# Add NVIDIA repository
-curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
-  sudo gpg --dearmor --batch --yes -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-
-curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
-  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-  sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-
-# Install toolkit
-sudo apt-get update
-sudo apt-get install -y nvidia-container-toolkit
-
-# Configure Docker
-sudo nvidia-ctk runtime configure --runtime=docker
-sudo systemctl restart docker
-```
-
-**Other distributions:** See [NVIDIA Container Toolkit Installation Guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-
-**2. Verify Installation**
-```bash
-docker run --rm --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all \
-  nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
-```
-
-You should see your GPU listed.
-
-**3. Build and Run GPU Docker**
-```bash
-# Build locally
-docker build -f Dockerfile.gpu -t face-morph:gpu .
-
-# Run with NVIDIA runtime
-docker run --rm --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all \
-  -v $(pwd)/data:/workspace/data:ro \
-  -v $(pwd)/results:/workspace/results:rw \
-  face-morph:gpu \
-  morph /workspace/data/face1.fbx /workspace/data/face2.fbx --gpu
-```
-
-**Note:** If you get `could not select device driver "" with capabilities: [[gpu]]` error, you need to install and configure the NVIDIA Container Toolkit first (step 1 above).
-
 ## Usage
 
-### CLI
+For bare metal installation (non-Docker), see [INSTALLATION.md](INSTALLATION.md).
+
+### CLI (Bare Metal)
+
+For Docker usage, see [Quick Start](#quick-start) section above.
 
 ```bash
 # Morph two faces
@@ -159,15 +74,8 @@ face-morph morph face1.fbx face2.fbx --gpu
 face-morph morph face1.fbx face2.fbx --gpu --minimal
 
 # Batch process folder (recommended for multiple pairs)
-face-morph batch data/ --gpu --minimal -o results/
+face-morph batch data/ --gpu --minimal
 ```
-
-**Options:**
-- `--gpu` / `--cpu`: Device selection (default: CPU)
-- `--minimal`: Fast mode - PNG frames + heatmaps only
-- `--no-amp`: Disable mixed precision (FP16)
-- `--log-level`: DEBUG|INFO|WARNING|ERROR
-- `-o, --output`: Output directory (default: `results/`)
 
 ### Python API
 
@@ -219,10 +127,12 @@ Real-world benchmarks (NVIDIA RTX 3080 Laptop, 18K vertex meshes, 41 frames per 
 
 | Configuration | Total Time | Per-Pair | Throughput | Speedup |
 |---------------|------------|----------|------------|---------|
-| **GPU + Minimal** ⭐ | **29.4s** | **4.8s** | 0.20 pairs/s | **2.1x** |
+| GPU + Minimal | 29.4s | 4.8s | 0.20 pairs/s | 2.1x |
 | GPU + Full | 247.8s | 41.1s | 0.02 pairs/s | 0.25x |
 | CPU + Minimal | 61.8s | 10.2s | 0.10 pairs/s | 1.0x |
 | CPU + Full | 277.3s | 46.2s | 0.02 pairs/s | 0.22x |
+
+For batches over 100 pairs, GPU with --minimal provides significant time savings.
 
 ## Heatmaps
 
@@ -269,7 +179,21 @@ See profiling documentation in `PROFILING_SUMMARY.md`.
 
 ## Troubleshooting
 
-### Common Issues
+### Docker Issues
+
+**Permission denied writing to results:**
+```bash
+chmod 777 results/
+# Or run as your user
+docker run --user $(id -u):$(id -g) ...
+```
+
+**GPU not detected (Docker GPU mode):**
+- Verify GPU on host: `nvidia-smi`
+- Verify NVIDIA runtime is installed
+- See [DOCKER.md](DOCKER.md) for GPU setup instructions
+
+### Bare Metal Issues
 
 **"CUDA out of memory"**
 - Reduce batch size: Add `--chunk-size 5` flag
@@ -279,33 +203,12 @@ See profiling documentation in `PROFILING_SUMMARY.md`.
 **"Blender not found"**
 - Install Blender 3.6+ from [blender.org](https://www.blender.org/download/)
 - Specify path: `--blender /path/to/blender`
-- Auto-detection checks: `blender`, `/usr/bin/blender`, `/Applications/Blender.app/Contents/MacOS/Blender`
 
 **"ModuleNotFoundError: pytorch3d"**
-- GPU mode only: Install PyTorch3D from source (see `environment.yml`)
+- Install PyTorch3D from source (see [INSTALLATION.md](INSTALLATION.md))
 - Or use CPU mode: `--cpu` (uses PyRender instead)
 
-**Mesh export overhead**
-- Full mode exports 41 OBJ mesh files
-- Use `--minimal` to skip mesh export for faster processing
-- Minimal mode includes PNG frames and heatmaps (sufficient for most use cases)
-
-### Platform-Specific Notes
-
-**Windows:**
-- PyTorch3D requires Visual Studio Build Tools (GPU mode only)
-- Use forward slashes in paths or raw strings: `r"C:\path\to\file.fbx"`
-- Run PowerShell as Administrator for conda commands
-
-**macOS:**
-- CUDA not supported (Apple dropped NVIDIA support in 2018)
-- CPU mode only
-- Install Blender from DMG or via `brew install --cask blender`
-
-**Linux:**
-- Best platform for GPU acceleration
-- Ensure NVIDIA drivers + CUDA toolkit installed
-- Check CUDA version: `nvcc --version`
+**Platform-specific issues:** See [INSTALLATION.md](INSTALLATION.md) for Windows, macOS, and Linux troubleshooting.
 
 ## Citation
 
@@ -327,9 +230,15 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-- [PyTorch3D](https://github.com/facebookresearch/pytorch3d) for GPU-accelerated 3D rendering
-- [PyRender](https://github.com/mmatl/pyrender) for CPU rendering backend
-- [Blender](https://www.blender.org/) for FBX/OBJ conversion
+- [PyTorch3D](https://github.com/facebookresearch/pytorch3d) - GPU-accelerated 3D rendering
+- [PyRender](https://github.com/mmatl/pyrender) - CPU rendering backend
+- [Blender](https://www.blender.org/) - FBX/OBJ conversion
+
+## Documentation
+
+- [INSTALLATION.md](INSTALLATION.md) - Bare metal installation on Windows, macOS, Linux
+- [DOCKER.md](DOCKER.md) - Docker deployment and GPU setup
+- `PROFILING_SUMMARY.md` - Performance profiling and benchmarks
 
 ## Contributing
 
@@ -342,3 +251,5 @@ Contributions welcome! Please:
 5. Open a Pull Request
 
 For major changes, please open an issue first to discuss proposed changes.
+
+**Development Setup:** See [INSTALLATION.md](INSTALLATION.md) for setting up a development environment.

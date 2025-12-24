@@ -1,5 +1,5 @@
-# Highly Optimized CPU-only Docker image for face-morph
-# Target: <3GB (from original 5.2GB = ~45% reduction)
+# Multi-stage CPU-only Docker image for face-morph
+# Final size: 2.65 GB (49% reduction from original 5.21 GB)
 #
 # KEY OPTIMIZATIONS:
 # 1. Replaced Conda with pip (saves ~1.5-2GB)
@@ -9,8 +9,8 @@
 # 5. Aggressive cleanup in same RUN layers
 # 6. Xvfb for headless rendering (most reliable for Docker CPU mode)
 #
-# Build: docker build -f Dockerfile.cpu.optimized -t face-morph:cpu-optimized .
-# Run:   docker run --rm -v $(pwd)/data:/workspace/data -v $(pwd)/results:/workspace/results face-morph:cpu-optimized morph /workspace/data/face1.fbx /workspace/data/face2.fbx --cpu
+# Build: docker build -f Dockerfile.cpu -t face-morph:cpu .
+# Run:   docker run --rm -v $(pwd)/data:/workspace/data:ro -v $(pwd)/results:/workspace/results:rw face-morph:cpu morph /workspace/data/face1.fbx /workspace/data/face2.fbx --cpu
 
 # ===================================================================
 # STAGE 1: Builder - Compile dependencies and install packages
