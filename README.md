@@ -10,12 +10,11 @@
 
 ## Features
 
-- 🎨 Linear interpolation between 3D face meshes with texture support
-- 📊 Shape and texture displacement heatmaps (normal, tangent, total components)
-- ⚡ GPU-accelerated batch rendering with PyTorch3D (2.1x faster than CPU)
-- 📈 CSV export for quantitative analysis
-- 🎬 MP4 video generation from morph sequences
-- 🚀 Optimized pipeline: GPU computation, result caching, batch processing
+- Linear interpolation between 3D face meshes with texture support
+- Shape and texture displacement heatmaps (normal, tangent, total components)
+- GPU-accelerated batch rendering with PyTorch3D
+- CSV export for quantitative analysis
+- MP4 video generation from morph sequences
 
 ## Quick Start
 
@@ -79,7 +78,7 @@ python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
 
 **Note:** GPU mode requires CUDA-compatible NVIDIA GPU. macOS does not support CUDA.
 
-### Docker (Recommended for Production)
+### Docker (Recommended)
 
 #### CPU Mode (No Setup Required)
 
@@ -225,22 +224,6 @@ Real-world benchmarks (NVIDIA RTX 3080 Laptop, 18K vertex meshes, 41 frames per 
 | CPU + Minimal | 61.8s | 10.2s | 0.10 pairs/s | 1.0x |
 | CPU + Full | 277.3s | 46.2s | 0.02 pairs/s | 0.22x |
 
-**Key Findings:**
-- GPU is **2.1x faster** than CPU (minimal mode)
-- Full mode adds **742% overhead** (FBX conversion + video encoding)
-- **Recommended:** GPU + Minimal for production workflows
-
-**When to Use Each Mode:**
-
-| Use Case | Recommended Config | Reason |
-|----------|-------------------|--------|
-| Production batch processing | GPU + Minimal | Fastest (4.8s/pair) |
-| Exploratory analysis | CPU + Minimal | No GPU needed |
-| Publication (need meshes/videos) | GPU + Full | Comprehensive output |
-| Single pair | CPU + Minimal | GPU overhead not worth it |
-
-*Benchmarked: 2025-12-23 | Version: v1.0.0 + GPU optimizations*
-
 ## Heatmaps
 
 ### Shape Displacement
@@ -329,10 +312,10 @@ See profiling documentation in `PROFILING_SUMMARY.md`.
 If you use this tool in your research, please cite:
 
 ```bibtex
-@software{face_morph_2024,
+@software{face_morph_2025,
   author = {Costantino, Andrea Ivan},
-  title = {face-morph: 3D Face Morphing with GPU Acceleration},
-  year = {2024},
+  title = {face-morph: 3D Face Morphing},
+  year = {2025},
   url = {https://github.com/costantinoai/face-morph},
   version = {1.0.0}
 }
@@ -359,7 +342,3 @@ Contributions welcome! Please:
 5. Open a Pull Request
 
 For major changes, please open an issue first to discuss proposed changes.
-
----
-
-**Status:** Production-ready | **Version:** 1.0.0 | **Last Updated:** 2025-12-23
