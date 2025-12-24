@@ -14,11 +14,27 @@
 
 Easiest way to get started. No CUDA setup required, works on any machine.
 
-**Single Pair:**
+**Step 1: Get the repository**
 ```bash
-# Build image
-docker build -f Dockerfile.cpu -t face-morph:cpu .
+# Clone the repository
+git clone https://github.com/costantinoai/face-morph.git
+cd face-morph
 
+# Or download and extract the ZIP from GitHub
+# Then: cd face-morph-main
+```
+
+**Step 2: Build the Docker image**
+```bash
+docker build -f Dockerfile.cpu -t face-morph:cpu .
+```
+
+First build takes ~1 minute. Subsequent builds use cache and are much faster.
+
+**Step 3: Run face morphing**
+
+Single pair:
+```bash
 # Process two faces
 docker run --rm \
   -v $(pwd)/data:/workspace/data:ro \
@@ -27,7 +43,7 @@ docker run --rm \
   morph /workspace/data/face1.fbx /workspace/data/face2.fbx --cpu --minimal
 ```
 
-**Batch Processing:**
+Batch processing:
 ```bash
 # Process all pairs in a folder
 docker run --rm \
