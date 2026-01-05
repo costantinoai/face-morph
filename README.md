@@ -38,32 +38,37 @@ docker pull ghcr.io/costantinoai/face-morph:latest
 
 **Run face morphing**
 
+Place your `.fbx` or `.obj` files in a folder (e.g., `data/`), then run:
+
 Single pair:
 ```bash
 docker run --rm \
-  -v $(pwd)/data:/workspace/data:ro \
-  -v $(pwd)/results:/workspace/results:rw \
+  -v /path/to/your/data:/workspace/data:ro \
+  -v /path/to/your/results:/workspace/results:rw \
   ghcr.io/costantinoai/face-morph:latest \
   morph /workspace/data/face1.fbx /workspace/data/face2.fbx --cpu --minimal
 ```
 
-Batch processing:
+Batch processing (all pairs in folder):
 ```bash
 docker run --rm \
-  -v $(pwd)/data:/workspace/data:ro \
-  -v $(pwd)/results:/workspace/results:rw \
+  -v /path/to/your/data:/workspace/data:ro \
+  -v /path/to/your/results:/workspace/results:rw \
   ghcr.io/costantinoai/face-morph:latest \
   batch /workspace/data --cpu --minimal
 ```
 
-Results saved to `results/YYYYMMDD_HHMMSS/`
+- `/path/to/your/data` — folder with your input meshes (change this)
+- `/path/to/your/results` — folder where outputs will be saved (change this)
+- `face1.fbx`, `face2.fbx` — your actual filenames (change this)
+
+Results saved to your results folder as `YYYYMMDD_HHMMSS/`
 
 **Common Options:**
 - `--cpu` / `--gpu` - Device selection (use `--cpu` for Docker CPU image)
 - `--minimal` - Fast mode, PNG + heatmaps only (recommended)
 - `-o, --output DIR` - Output directory (default: `results/`)
 - `--log-level LEVEL` - DEBUG|INFO|WARNING|ERROR (default: INFO)
-- `--blender PATH` - Path to Blender executable (default: auto-detect)
 
 ### Docker GPU (Build Locally)
 
@@ -80,7 +85,7 @@ cd face-morph
 docker build -f Dockerfile.gpu -t face-morph:gpu .
 
 # Run with GPU
-docker run --rm --gpus all \
+docker run --rm --gpus all \                     # Enable GPU access
   -v $(pwd)/data:/workspace/data:ro \
   -v $(pwd)/results:/workspace/results:rw \
   face-morph:gpu \
