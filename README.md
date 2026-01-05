@@ -32,16 +32,8 @@
 
 Easiest way to get started. No CUDA setup required, works on any machine.
 
-**Option A: Pull pre-built image (fastest)**
 ```bash
-docker pull ghcr.io/costantinoai/face-morph:cpu
-```
-
-**Option B: Build locally**
-```bash
-git clone https://github.com/costantinoai/face-morph.git
-cd face-morph
-docker build -f Dockerfile.cpu -t face-morph:cpu .
+docker pull ghcr.io/costantinoai/face-morph:latest
 ```
 
 **Run face morphing**
@@ -51,7 +43,7 @@ Single pair:
 docker run --rm \
   -v $(pwd)/data:/workspace/data:ro \
   -v $(pwd)/results:/workspace/results:rw \
-  ghcr.io/costantinoai/face-morph:cpu \
+  ghcr.io/costantinoai/face-morph:latest \
   morph /workspace/data/face1.fbx /workspace/data/face2.fbx --cpu --minimal
 ```
 
@@ -60,7 +52,7 @@ Batch processing:
 docker run --rm \
   -v $(pwd)/data:/workspace/data:ro \
   -v $(pwd)/results:/workspace/results:rw \
-  ghcr.io/costantinoai/face-morph:cpu \
+  ghcr.io/costantinoai/face-morph:latest \
   batch /workspace/data --cpu --minimal
 ```
 
@@ -73,21 +65,25 @@ Results saved to `results/YYYYMMDD_HHMMSS/`
 - `--log-level LEVEL` - DEBUG|INFO|WARNING|ERROR (default: INFO)
 - `--blender PATH` - Path to Blender executable (default: auto-detect)
 
-### Docker GPU (Large Batches)
+### Docker GPU (Build Locally)
 
-For processing 100+ pairs, the GPU version provides significant speedup.
+For processing 100+ pairs, the GPU version provides significant speedup. The GPU image must be built locally because it's ~10GB (includes CUDA libraries and PyTorch3D).
 
-> **Note:** The GPU image is ~10GB due to CUDA libraries. Requires [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) on the host (not just CUDA drivers).
+**Requirements:**
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed on host
+- ~15GB free disk space for build
 
 ```bash
-# Pull GPU image
-docker pull ghcr.io/costantinoai/face-morph:gpu
+# Clone and build GPU image
+git clone https://github.com/costantinoai/face-morph.git
+cd face-morph
+docker build -f Dockerfile.gpu -t face-morph:gpu .
 
 # Run with GPU
 docker run --rm --gpus all \
   -v $(pwd)/data:/workspace/data:ro \
   -v $(pwd)/results:/workspace/results:rw \
-  ghcr.io/costantinoai/face-morph:gpu \
+  face-morph:gpu \
   batch /workspace/data --gpu --minimal
 ```
 
