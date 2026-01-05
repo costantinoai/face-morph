@@ -8,48 +8,59 @@
 
 ![Morphing Animation](assets/demo_morph.gif)
 
+![Heatmap Analysis](assets/demo_heatmaps.png)
+
+### Shape Displacement Components (Top Row)
+
+| Component | Description | Colormap |
+|-----------|-------------|----------|
+| **Normal** | Depth changes perpendicular to the surface. Red = expansion outward, Blue = contraction inward. Useful for detecting facial features that protrude or recede. | Diverging (red-blue) |
+| **Tangential** | Movement parallel to the surface (sliding). Shows how vertices shift along the face without changing depth. | Sequential (purple-yellow) |
+| **Total** | Combined 3D displacement magnitude (√(normal² + tangential²)). Overall measure of geometric difference. | Sequential (purple-yellow) |
+
+### Texture Difference Components (Bottom Row)
+
+| Component | Description | Colormap |
+|-----------|-------------|----------|
+| **Luminance** | Brightness differences between textures. Red = brighter in face 2, Blue = darker in face 2. | Diverging (red-blue) |
+| **Chrominance** | Color/saturation differences independent of brightness. Highlights hue and saturation changes. | Sequential (purple-yellow) |
+| **ΔE (Total)** | CIEDE2000 perceptual color difference (industry standard). Human-calibrated metric where ΔE > 2 is noticeable. | Sequential (purple-yellow) |
+
 ## Quick Start
 
 ### Docker CPU (Recommended)
 
 Easiest way to get started. No CUDA setup required, works on any machine.
 
-**Step 1: Get the repository**
+**Option A: Pull pre-built image (fastest)**
 ```bash
-# Clone the repository
-git clone https://github.com/costantinoai/face-morph.git
-cd face-morph
-
-# Or download and extract the ZIP from GitHub
-# Then: cd face-morph-main
+docker pull ghcr.io/costantinoai/face-morph:cpu
 ```
 
-**Step 2: Build the Docker image**
+**Option B: Build locally**
 ```bash
+git clone https://github.com/costantinoai/face-morph.git
+cd face-morph
 docker build -f Dockerfile.cpu -t face-morph:cpu .
 ```
 
-First build takes ~10 minutes. Subsequent builds use cache and are much faster.
-
-**Step 3: Run face morphing**
+**Run face morphing**
 
 Single pair:
 ```bash
-# Process two faces
 docker run --rm \
   -v $(pwd)/data:/workspace/data:ro \
   -v $(pwd)/results:/workspace/results:rw \
-  face-morph:cpu \
+  ghcr.io/costantinoai/face-morph:cpu \
   morph /workspace/data/face1.fbx /workspace/data/face2.fbx --cpu --minimal
 ```
 
 Batch processing:
 ```bash
-# Process all pairs in a folder
 docker run --rm \
   -v $(pwd)/data:/workspace/data:ro \
   -v $(pwd)/results:/workspace/results:rw \
-  face-morph:cpu \
+  ghcr.io/costantinoai/face-morph:cpu \
   batch /workspace/data --cpu --minimal
 ```
 
@@ -62,7 +73,25 @@ Results saved to `results/YYYYMMDD_HHMMSS/`
 - `--log-level LEVEL` - DEBUG|INFO|WARNING|ERROR (default: INFO)
 - `--blender PATH` - Path to Blender executable (default: auto-detect)
 
-**GPU Docker:** For large batches (100+ pairs), see [DOCKER.md](DOCKER.md) for GPU setup instructions.
+### Docker GPU (Large Batches)
+
+For processing 100+ pairs, the GPU version provides significant speedup.
+
+> **Note:** The GPU image is ~10GB due to CUDA libraries. Requires [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) on the host (not just CUDA drivers).
+
+```bash
+# Pull GPU image
+docker pull ghcr.io/costantinoai/face-morph:gpu
+
+# Run with GPU
+docker run --rm --gpus all \
+  -v $(pwd)/data:/workspace/data:ro \
+  -v $(pwd)/results:/workspace/results:rw \
+  ghcr.io/costantinoai/face-morph:gpu \
+  batch /workspace/data --gpu --minimal
+```
+
+See [DOCKER.md](DOCKER.md) for detailed GPU setup instructions.
 
 **Bare Metal Installation:** For native installation without Docker, see [INSTALLATION.md](INSTALLATION.md).
 
@@ -134,22 +163,6 @@ Includes everything above **plus:**
 ├── vertex_displacements.csv                # Per-vertex data
 └── texture_differences.csv                 # Per-pixel texture data
 ```
-
-## Heatmaps
-
-### Shape Displacement
-
-Three orthogonal components:
-- **Normal:** Depth changes (expansion/contraction perpendicular to surface)
-- **Tangential:** Positional changes (movement parallel to surface)
-- **Total:** Complete 3D displacement magnitude
-
-### Texture Difference
-
-Three perceptual components:
-- **Luminance:** Brightness differences
-- **Chrominance:** Color/saturation differences
-- **ΔE (CIEDE2000):** Perceptual color difference (industry standard)
 
 ## Troubleshooting
 
